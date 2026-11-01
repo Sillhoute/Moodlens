@@ -1,0 +1,67 @@
+name: taskflow
+
+services:
+  frontend:
+    image: ${IMAGE_PREFIX:-taskflow}/frontend:${IMAGE_TAG:-local}
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8088}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - web
+
+  backend:
+    image: ${IMAGE_PREFIX:-taskflow}/backend:${IMAGE_TAG:-local}
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-taskflow}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi}
+      PGDATABASE: ${POSTGRES_DB:-taskflow}
+      APP_VERSION: ${IMAGE_TAG:-local}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - web
+      - data
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-taskflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi}
+      POSTGRES_DB: ${POSTGRES_DB:-taskflow}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - data
+
+# Database hanya berada di network "data", sehingga frontend tidak bisa mengaksesnya langsung.
+networks:
+  web:
+  data:
+
+volumes:
+  db-data:
