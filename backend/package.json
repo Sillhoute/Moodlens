@@ -1,5 +1,5 @@
 {
-  "name": "taskflow-backend",
+  "name": "moodlens-backend",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "express": "^5.3.0",
+    "multer": "^2.5.0",
     "pg": "^8.23.1"
   },
   "devDependencies": {

@@ -1,13 +1,35 @@
-# TaskFlow
+# MoodLens
 
-Papan manajemen tugas berbasis web untuk UTS DevOps. Aplikasi berjalan dalam tiga container
-(frontend, backend, database) dan di-deploy otomatis dengan GitHub Actions.
+Aplikasi web pengenal ekspresi wajah untuk UTS Deep Learning dan UTS DevOps. Aplikasi mengenali 7 ekspresi
+dari foto atau kamera, berjalan dalam empat container, dan di-deploy otomatis dengan GitHub Actions.
 
 | Container | Teknologi | Peran |
 | --- | --- | --- |
-| `frontend` | React, Vite, Nginx | Menyajikan antarmuka dan meneruskan `/api` ke backend |
-| `backend` | Node.js, Express | REST API dan validasi data |
-| `db` | PostgreSQL 16 | Menyimpan data pada volume `db-data` |
+| `frontend` | React, Vite, Nginx | Antarmuka dan meneruskan `/api` ke backend |
+| `backend` | Node.js, Express | Validasi upload, memanggil model, menyimpan riwayat |
+| `ml-service` | Python, FastAPI, TensorFlow, OpenCV | Deteksi wajah dan prediksi ekspresi |
+| `db` | PostgreSQL 16 | Menyimpan riwayat pada volume `db-data` |
+
+Foto wajah hanya diproses di memori dan tidak disimpan. Riwayat hanya berisi ekspresi, skor, model, dan waktu.
+
+## Model
+
+Arsitektur dan bobot berasal dari notebook UTS Deep Learning dengan dataset FER.
+
+| Model | Akurasi | Parameter | Dipakai untuk |
+| --- | --- | --- | --- |
+| ResNet50 (transfer learning) | 61% | 24,1 juta | Foto |
+| Custom Residual CNN | 56% | 1,3 juta | Kamera dan foto |
+
+Akurasi berasal dari folder test yang juga dipakai saat memilih bobot terbaik, sehingga cenderung optimistis.
+Model membaca ekspresi di wajah, bukan perasaan seseorang.
+
+`ml-service/weights` berisi bobot tanpa data optimizer. Untuk membuatnya ulang dari file hasil training,
+jalankan perintah berikut dari folder `ml-service` dalam environment yang sudah memasang `requirements.txt`:
+
+```bash
+python -m scripts.strip_weights <folder bobot notebook> weights
+```
 
 ## Menjalankan secara lokal
 
@@ -23,7 +45,8 @@ Ubah `POSTGRES_PASSWORD` di `.env`, lalu jalankan:
 docker compose up -d --build --wait
 ```
 
-Aplikasi terbuka di <http://localhost:8088>. Port dapat diubah lewat `APP_PORT`.
+Aplikasi terbuka di <http://localhost:8088>. Port dapat diubah lewat `APP_PORT`. Build pertama butuh waktu lama
+karena image `ml-service` berukuran sekitar 2,6 GB, dan container ini memakai memori sekitar 1 GB.
 
 Menghentikan container tanpa menghapus data:
 
@@ -31,10 +54,12 @@ Menghentikan container tanpa menghapus data:
 docker compose down
 ```
 
+Kamera hanya bisa dipakai lewat `localhost` atau HTTPS. Di alamat lain, gunakan menu Foto.
+
 ## Menjalankan test
 
 Backend membutuhkan PostgreSQL yang dapat diakses lewat variabel `PGHOST`, `PGPORT`, `PGUSER`,
-`PGPASSWORD`, dan `PGDATABASE`. Test mengosongkan tabel `tasks`, jadi gunakan database khusus test.
+`PGPASSWORD`, dan `PGDATABASE`. Test mengosongkan tabel `predictions`, jadi gunakan database khusus test.
 
 ```bash
 cd backend && npm ci && npm test
@@ -44,15 +69,22 @@ cd backend && npm ci && npm test
 cd frontend && npm ci && npm test
 ```
 
+```bash
+cd ml-service && pip install -r requirements-dev.txt && python -m pytest -q
+```
+
+Foto uji `ml-service/tests/fixtures/astronaut.jpg` adalah foto NASA domain publik dari paket scikit-image.
+
 ## Alur CI/CD
 
 Workflow ada di `.github/workflows/ci-cd.yml`.
 
-1. **Test** (setiap push dan pull request ke `main`): test backend dengan PostgreSQL, test dan build frontend.
-2. **Build dan push** (hanya push ke `main`): image frontend dan backend dikirim ke GitHub Container
-   Registry dengan tag commit SHA dan `latest`.
-3. **Deploy** (hanya push ke `main`): self-hosted runner menarik image dan menjalankan
-   `docker compose up`, lalu smoke test ke `/api/health`.
+1. **Test** (setiap push dan pull request ke `main`): test backend dengan PostgreSQL, test dan build frontend,
+   serta test model dengan bobot asli.
+2. **Build dan push** (hanya push ke `main`): ketiga image dikirim ke GitHub Container Registry dengan tag
+   commit SHA dan `latest`.
+3. **Deploy** (hanya push ke `main`): self-hosted runner menarik image dan menjalankan `docker compose up`,
+   lalu smoke test ke `/api/health` dan satu prediksi sungguhan.
 
 Versi yang sedang berjalan tampil di bagian bawah halaman aplikasi.
 

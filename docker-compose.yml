@@ -1,8 +1,8 @@
-name: taskflow
+name: moodlens
 
 services:
   frontend:
-    image: ${IMAGE_PREFIX:-taskflow}/frontend:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-moodlens}/frontend:${IMAGE_TAG:-local}
     build: ./frontend
     restart: unless-stopped
     ports:
@@ -19,48 +19,68 @@ services:
       - web
 
   backend:
-    image: ${IMAGE_PREFIX:-taskflow}/backend:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-moodlens}/backend:${IMAGE_TAG:-local}
     build: ./backend
     restart: unless-stopped
     environment:
       PGHOST: db
-      PGUSER: ${POSTGRES_USER:-taskflow}
+      PGUSER: ${POSTGRES_USER:-moodlens}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi}
-      PGDATABASE: ${POSTGRES_DB:-taskflow}
+      PGDATABASE: ${POSTGRES_DB:-moodlens}
+      ML_URL: http://ml-service:8000
       APP_VERSION: ${IMAGE_TAG:-local}
     depends_on:
       db:
         condition: service_healthy
+      ml-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 5
       start_period: 10s
     networks:
       - web
+      - model
       - data
+
+  ml-service:
+    image: ${IMAGE_PREFIX:-moodlens}/ml-service:${IMAGE_TAG:-local}
+    build: ./ml-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # Memuat TensorFlow dan kedua model butuh waktu saat container baru menyala.
+      start_period: 90s
+    networks:
+      - model
 
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-taskflow}
+      POSTGRES_USER: ${POSTGRES_USER:-moodlens}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi}
-      POSTGRES_DB: ${POSTGRES_DB:-taskflow}
+      POSTGRES_DB: ${POSTGRES_DB:-moodlens}
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -h 127.0.0.1"]
       interval: 5s
       timeout: 3s
       retries: 10
     networks:
       - data
 
-# Database hanya berada di network "data", sehingga frontend tidak bisa mengaksesnya langsung.
+# Hanya backend yang terhubung ke ketiga network. Frontend tidak bisa mengakses
+# database atau model secara langsung, dan model tidak bisa mengakses database.
 networks:
   web:
+  model:
   data:
 
 volumes:

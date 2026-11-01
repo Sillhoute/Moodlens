@@ -1,87 +1,96 @@
 import express from 'express';
+import multer from 'multer';
+import { MlError } from './ml.js';
 
-const STATUSES = ['todo', 'in_progress', 'done'];
-const MAX_TITLE_LENGTH = 200;
+const MODELS = ['vanilla', 'resnet'];
+const SOURCES = ['upload', 'camera'];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-const validateTitle = (title) => {
-  if (typeof title !== 'string' || title.trim() === '') return 'Judul tugas wajib diisi';
-  if (title.trim().length > MAX_TITLE_LENGTH) return `Judul maksimal ${MAX_TITLE_LENGTH} karakter`;
-  return null;
+const clientError = (status, message) => Object.assign(new Error(message), { status, expose: true });
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMAGE_BYTES, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (IMAGE_TYPES.includes(file.mimetype)) return callback(null, true);
+    callback(clientError(415, 'Format gambar harus JPEG, PNG, atau WebP'));
+  },
+});
+
+const parseModels = (value) => {
+  const models = [...new Set(String(value ?? 'resnet').split(',').map((name) => name.trim()))];
+  return models.every((name) => MODELS.includes(name)) ? models : null;
 };
 
-const validateTaskFields = ({ title, description, status }) => {
-  if (title !== undefined) {
-    const error = validateTitle(title);
-    if (error) return error;
-  }
-  if (description !== undefined && typeof description !== 'string') {
-    return 'Deskripsi harus berupa teks';
-  }
-  if (status !== undefined && !STATUSES.includes(status)) {
-    return `Status harus salah satu dari: ${STATUSES.join(', ')}`;
-  }
-  return null;
-};
+const toHistoryRows = (result, source) =>
+  result.faces.flatMap((face) =>
+    Object.entries(face.results).map(([model, prediction]) => ({
+      source,
+      model,
+      emotion: prediction.emotion,
+      score: prediction.score,
+      probabilities: prediction.probabilities,
+      latency_ms: result.latency_ms?.[model] ?? null,
+    })),
+  );
 
-export const createApp = (pool) => {
+export const createApp = ({ pool, ml }) => {
   const app = express();
-  app.use(express.json());
-
-  // Id di luar format angka tidak mungkin ada di tabel, jadi langsung dijawab 404.
-  app.param('id', (_req, res, next, id) => {
-    if (/^\d{1,9}$/.test(id)) return next();
-    res.status(404).json({ message: 'Tugas tidak ditemukan' });
-  });
 
   // Dipakai oleh healthcheck container dan smoke test pada tahap deploy.
   app.get('/api/health', async (_req, res) => {
-    try {
-      await pool.query('SELECT 1');
-      res.json({ status: 'ok', version: process.env.APP_VERSION ?? 'dev' });
-    } catch {
-      res.status(503).json({ status: 'error', message: 'Database tidak dapat diakses' });
-    }
+    const [database, model] = await Promise.all([
+      pool.query('SELECT 1').then(() => true, () => false),
+      ml.isHealthy(),
+    ]);
+    res.status(database && model ? 200 : 503).json({
+      status: database && model ? 'ok' : 'error',
+      database,
+      model,
+      version: process.env.APP_VERSION ?? 'dev',
+    });
   });
 
-  app.get('/api/tasks', async (_req, res) => {
-    const { rows } = await pool.query('SELECT * FROM tasks ORDER BY created_at DESC, id DESC');
+  app.post('/api/predictions', upload.single('image'), async (req, res) => {
+    if (!req.file) throw clientError(400, 'Gambar wajib dikirim');
+
+    const models = parseModels(req.body.models);
+    if (!models) throw clientError(400, `Model harus salah satu dari: ${MODELS.join(', ')}`);
+
+    const source = req.body.source ?? 'upload';
+    if (!SOURCES.includes(source)) throw clientError(400, `Sumber harus salah satu dari: ${SOURCES.join(', ')}`);
+
+    const result = await ml.predict(req.file.buffer, req.file.mimetype, models);
+
+    const rows = req.body.save === 'false' ? [] : toHistoryRows(result, source);
+    if (rows.length > 0) {
+      await pool.query(
+        `INSERT INTO predictions (source, model, emotion, score, probabilities, latency_ms)
+         SELECT source, model, emotion, score, probabilities, latency_ms
+         FROM jsonb_to_recordset($1::jsonb) AS row(
+           source text, model text, emotion text, score real, probabilities jsonb, latency_ms real
+         )`,
+        [JSON.stringify(rows)],
+      );
+    }
+    res.json({ ...result, saved: rows.length });
+  });
+
+  app.get('/api/predictions', async (_req, res) => {
+    const { rows } = await pool.query('SELECT * FROM predictions ORDER BY created_at DESC, id DESC LIMIT 50');
     res.json(rows);
   });
 
-  app.post('/api/tasks', async (req, res) => {
-    const { title, description = '' } = req.body ?? {};
-    const error = validateTitle(title) ?? validateTaskFields({ description });
-    if (error) return res.status(400).json({ message: error });
-
+  app.get('/api/predictions/stats', async (_req, res) => {
     const { rows } = await pool.query(
-      'INSERT INTO tasks (title, description) VALUES ($1, $2) RETURNING *',
-      [title.trim(), description.trim()],
+      'SELECT emotion, COUNT(*)::int AS count FROM predictions GROUP BY emotion ORDER BY count DESC, emotion',
     );
-    res.status(201).json(rows[0]);
+    res.json(rows);
   });
 
-  app.patch('/api/tasks/:id', async (req, res) => {
-    const { title, description, status } = req.body ?? {};
-    const error = validateTaskFields({ title, description, status });
-    if (error) return res.status(400).json({ message: error });
-
-    const { rows } = await pool.query(
-      `UPDATE tasks
-       SET title = COALESCE($1, title),
-           description = COALESCE($2, description),
-           status = COALESCE($3, status),
-           updated_at = NOW()
-       WHERE id = $4
-       RETURNING *`,
-      [title?.trim(), description?.trim(), status, req.params.id],
-    );
-    if (rows.length === 0) return res.status(404).json({ message: 'Tugas tidak ditemukan' });
-    res.json(rows[0]);
-  });
-
-  app.delete('/api/tasks/:id', async (req, res) => {
-    const { rowCount } = await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
-    if (rowCount === 0) return res.status(404).json({ message: 'Tugas tidak ditemukan' });
+  app.delete('/api/predictions', async (_req, res) => {
+    await pool.query('DELETE FROM predictions');
     res.status(204).end();
   });
 
@@ -89,8 +98,12 @@ export const createApp = (pool) => {
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {
-    if (err.status && err.status < 500) {
-      return res.status(err.status).json({ message: 'Permintaan tidak valid' });
+    if (err instanceof multer.MulterError) {
+      const message = err.code === 'LIMIT_FILE_SIZE' ? 'Ukuran gambar maksimal 5 MB' : 'Unggahan tidak valid';
+      return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ message });
+    }
+    if (err instanceof MlError || err.expose) {
+      return res.status(err.status).json({ message: err.message });
     }
     console.error(err);
     res.status(500).json({ message: 'Terjadi kesalahan pada server' });
