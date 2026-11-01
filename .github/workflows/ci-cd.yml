@@ -100,7 +100,7 @@ jobs:
   # ---------- Continuous Deployment ----------
   deploy:
     needs: build-and-push
-    runs-on: self-hosted
+    runs-on: [self-hosted, Windows]
     permissions:
       contents: read
       packages: read
@@ -110,7 +110,7 @@ jobs:
       APP_PORT: 8088
     defaults:
       run:
-        shell: bash
+        shell: powershell
     steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
@@ -120,11 +120,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Tarik image terbaru dan jalankan container
         run: |
+          # Docker menulis progres ke stderr, jadi kegagalan dicek dari exit code.
+          $ErrorActionPreference = 'Continue'
           # Nama image di registry wajib huruf kecil.
-          export IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
+          $env:IMAGE_PREFIX = "ghcr.io/$($env:GITHUB_REPOSITORY.ToLower())"
           docker compose pull frontend backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           docker compose up -d --no-build --remove-orphans --wait --wait-timeout 120
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smoke test
         run: |
-          curl --fail --silent --show-error --max-time 10 --retry 5 --retry-delay 3 --retry-all-errors \
-            "http://127.0.0.1:${APP_PORT}/api/health"
+          $ErrorActionPreference = 'Continue'
+          curl.exe --fail --silent --show-error --max-time 10 --retry 5 --retry-delay 3 --retry-all-errors "http://127.0.0.1:$($env:APP_PORT)/api/health"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
