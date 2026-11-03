@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react';
 import { getMe, hasToken, logout, onUnauthorized } from './api.js';
 import AuthPage from './components/AuthPage.jsx';
+import { Backdrop, Wordmark } from './components/Brand.jsx';
 import HistoryTab from './components/HistoryTab.jsx';
+import { ChartIcon, ChipIcon, HistoryIcon, LogoutIcon, ScanIcon } from './components/Icons.jsx';
 import ModelInfoTab from './components/ModelInfoTab.jsx';
 import RecognizeTab from './components/RecognizeTab.jsx';
 import StatsTab from './components/StatsTab.jsx';
+import { initials } from './labels.js';
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'local';
 
 const TABS = [
-  { id: 'recognize', label: 'Kenali Ekspresi', Component: RecognizeTab },
-  { id: 'history', label: 'Riwayat', Component: HistoryTab },
-  { id: 'stats', label: 'Statistik', Component: StatsTab },
-  { id: 'model', label: 'Info Model', Component: ModelInfoTab },
+  { id: 'recognize', label: 'Kenali', Icon: ScanIcon, Component: RecognizeTab },
+  { id: 'history', label: 'Riwayat', Icon: HistoryIcon, Component: HistoryTab },
+  { id: 'stats', label: 'Statistik', Icon: ChartIcon, Component: StatsTab },
+  { id: 'model', label: 'Info Model', Icon: ChipIcon, Component: ModelInfoTab },
 ];
 
 export default function App() {
@@ -47,48 +50,62 @@ export default function App() {
   const { Component } = TABS.find((tab) => tab.id === activeId);
 
   return (
-    <div className="page">
-      <header className="app-header">
-        <div>
-          <h1>FER Ensemble</h1>
-          <p>Pengenalan ekspresi wajah dengan ensemble CNN dan ResNet50.</p>
+    <div className="shell">
+      <Backdrop />
+      <div className="gradient-bar" />
+
+      <header className="topbar">
+        <div className="container topbar-inner">
+          <Wordmark />
+          {user && (
+            <>
+              <nav className="nav" aria-label="Menu utama">
+                {TABS.map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={id === activeId ? 'active' : ''}
+                    aria-current={id === activeId ? 'page' : undefined}
+                    onClick={() => setActiveId(id)}
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </button>
+                ))}
+              </nav>
+              <div className="user-menu">
+                <span className="avatar" aria-hidden="true">
+                  {initials(user)}
+                </span>
+                <span className="user-name">{user.full_name || user.username}</span>
+                <button type="button" className="ghost icon-button" onClick={handleLogout} title="Keluar">
+                  <LogoutIcon size={18} />
+                  <span className="sr-only">Keluar</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
-        {user && (
-          <div className="user-menu">
-            <span>{user.full_name || user.username}</span>
-            <button type="button" onClick={handleLogout}>
-              Keluar
-            </button>
-          </div>
-        )}
       </header>
 
-      {checking ? (
-        <p className="muted">Memuat...</p>
-      ) : user ? (
-        <>
-          <nav className="tabs" aria-label="Menu utama">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={tab.id === activeId ? 'tab active' : 'tab'}
-                aria-current={tab.id === activeId ? 'page' : undefined}
-                onClick={() => setActiveId(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-          <main>
-            <Component />
-          </main>
-        </>
-      ) : (
-        <AuthPage onLogin={handleLogin} message={sessionMessage} />
-      )}
+      <main className="container">
+        {checking ? (
+          <p className="muted">Memuat...</p>
+        ) : user ? (
+          <Component />
+        ) : (
+          <AuthPage onLogin={handleLogin} message={sessionMessage} />
+        )}
+      </main>
 
-      <footer>Versi deploy: {APP_VERSION}</footer>
+      <footer>
+        <div className="container footer-inner">
+          <span>FER Ensemble · UTS Deep Learning dan DevOps</span>
+          <span>
+            Versi deploy: <code>{APP_VERSION}</code>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { errorMessage } from './api.js';
-import { boxToPercent, faceLabel, formatPercent, topProbabilities } from './labels.js';
+import {
+  EMOTION_COLORS,
+  EMOTION_LABELS,
+  boxToPercent,
+  faceColor,
+  faceLabel,
+  formatPercent,
+  initials,
+  topProbabilities,
+} from './labels.js';
 
 describe('faceLabel', () => {
   it('menerjemahkan label ekspresi', () => {
@@ -9,6 +18,24 @@ describe('faceLabel', () => {
 
   it('menampilkan kurang jelas saat keyakinan di bawah ambang', () => {
     expect(faceLabel({ label: null, top_label: 'sad' })).toBe('Kurang jelas');
+  });
+});
+
+describe('faceColor', () => {
+  it('memakai warna ekspresi, atau warna netral untuk wajah kurang jelas', () => {
+    expect(faceColor({ label: 'happy' })).toBe(EMOTION_COLORS.happy);
+    expect(faceColor({ label: null })).toBe(EMOTION_COLORS.kurang_jelas);
+  });
+
+  it('punya warna untuk setiap label', () => {
+    expect(Object.keys(EMOTION_COLORS).sort()).toEqual(Object.keys(EMOTION_LABELS).sort());
+  });
+});
+
+describe('initials', () => {
+  it('mengambil huruf depan dari nama lengkap, atau dari username', () => {
+    expect(initials({ full_name: 'nicholas kosasih', username: 'nk' })).toBe('NK');
+    expect(initials({ full_name: null, username: 'demo' })).toBe('D');
   });
 });
 

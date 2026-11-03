@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { predict } from '../api.js';
+import { CameraIcon, UploadIcon } from './Icons.jsx';
 import { AnnotatedImage, ResultPanel } from './ResultView.jsx';
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_SNAPSHOT_WIDTH = 1280;
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const cameraErrorMessage = (err) =>
   err.name === 'NotAllowedError'
@@ -52,16 +54,56 @@ function useAnalysis() {
   return { result, error, loading, analyse, reset, setError };
 }
 
+function Dropzone({ onFile, compact }) {
+  const [dragging, setDragging] = useState(false);
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files[0];
+    if (file) onFile(file);
+  };
+
+  return (
+    <label
+      className={`dropzone${dragging ? ' dragging' : ''}${compact ? ' compact' : ''}`}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+    >
+      <span className="icon-bubble">
+        <UploadIcon />
+      </span>
+      <strong>{compact ? 'Ganti foto' : 'Tarik foto ke sini, atau klik untuk memilih'}</strong>
+      {!compact && <span className="muted small">JPG, PNG, atau WebP, maksimal 5 MB. Boleh berisi beberapa wajah.</span>}
+      <input
+        type="file"
+        accept={IMAGE_TYPES.join(',')}
+        onChange={(event) => {
+          if (event.target.files[0]) onFile(event.target.files[0]);
+          event.target.value = '';
+        }}
+      />
+    </label>
+  );
+}
+
 function UploadMode() {
   const [imageUrl, setImageUrl] = useState('');
   const { result, error, loading, analyse, reset, setError } = useAnalysis();
 
   useEffect(() => () => imageUrl && URL.revokeObjectURL(imageUrl), [imageUrl]);
 
-  const handleFile = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  const handleFile = (file) => {
     reset();
+    if (!IMAGE_TYPES.includes(file.type)) {
+      setImageUrl('');
+      setError('Format foto harus JPG, PNG, atau WebP');
+      return;
+    }
     setImageUrl(URL.createObjectURL(file));
     if (file.size > MAX_UPLOAD_BYTES) {
       setError('Ukuran foto maksimal 5 MB');
@@ -72,10 +114,7 @@ function UploadMode() {
 
   return (
     <div className="stack">
-      <label className="card file-picker">
-        Pilih foto wajah (JPG, PNG, atau WebP, maksimal 5 MB). Foto boleh berisi beberapa wajah.
-        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} />
-      </label>
+      <Dropzone onFile={handleFile} compact={Boolean(imageUrl)} />
       {error && (
         <p className="error" role="alert">
           {error}
@@ -83,7 +122,7 @@ function UploadMode() {
       )}
       {imageUrl && (
         <div className="result-layout">
-          <AnnotatedImage src={imageUrl} result={result} alt="Foto yang dianalisis" />
+          <AnnotatedImage src={imageUrl} result={result} alt="Foto yang dianalisis" scanning={loading} />
           <ResultPanel result={result} loading={loading} />
         </div>
       )}
@@ -140,7 +179,10 @@ function WebcamMode() {
 
   const toggleCamera = () => {
     setCameraError('');
-    if (running) reset();
+    if (running) {
+      reset();
+      setSnapshotUrl('');
+    }
     setRunning((value) => !value);
   };
 
@@ -148,37 +190,57 @@ function WebcamMode() {
     return <p className="notice">Webcam hanya bisa dipakai lewat localhost atau HTTPS. Gunakan mode Unggah foto.</p>;
   }
 
+  if (!running) {
+    return (
+      <div className="stack">
+        {cameraError && (
+          <p className="error" role="alert">
+            {cameraError}
+          </p>
+        )}
+        <div className="card empty-state">
+          <span className="icon-bubble">
+            <CameraIcon size={26} />
+          </span>
+          <strong>Kamera belum menyala</strong>
+          <p className="muted small">Setiap foto yang diambil disimpan hasilnya ke riwayat, bukan fotonya.</p>
+          <button type="button" className="primary" onClick={toggleCamera}>
+            Nyalakan kamera
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="stack">
-      <div className="card controls-row">
-        <button type="button" className={running ? '' : 'primary'} onClick={toggleCamera}>
-          {running ? 'Matikan kamera' : 'Nyalakan kamera'}
+      <div className="camera-actions">
+        <button type="button" className="primary" onClick={handleCapture} disabled={loading}>
+          <CameraIcon size={18} />
+          {loading ? 'Menganalisis...' : 'Ambil foto dan kenali'}
         </button>
-        {running && (
-          <button type="button" className="primary" onClick={handleCapture} disabled={loading}>
-            {loading ? 'Menganalisis...' : 'Ambil foto dan kenali'}
-          </button>
-        )}
-        <span className="muted small">Setiap foto yang diambil disimpan hasilnya ke riwayat, bukan fotonya.</span>
+        <button type="button" onClick={toggleCamera}>
+          Matikan kamera
+        </button>
       </div>
 
-      {(cameraError || error) && (
+      {error && (
         <p className="error" role="alert">
-          {cameraError || error}
+          {error}
         </p>
       )}
 
-      {running && (
-        <div className="result-layout">
-          <div className="stack">
-            <div className="preview">
-              <video ref={videoRef} className="mirrored" autoPlay playsInline muted />
-            </div>
-            {snapshotUrl && result && <AnnotatedImage src={snapshotUrl} result={result} alt="Foto dari webcam" />}
+      <div className="result-layout">
+        <div className="stack">
+          <div className="preview">
+            <video ref={videoRef} className="mirrored" autoPlay playsInline muted />
           </div>
-          <ResultPanel result={result} loading={loading} />
+          {snapshotUrl && (result || loading) && (
+            <AnnotatedImage src={snapshotUrl} result={result} alt="Foto dari webcam" scanning={loading} />
+          )}
         </div>
-      )}
+        <ResultPanel result={result} loading={loading} />
+      </div>
     </div>
   );
 }
@@ -188,33 +250,36 @@ export default function RecognizeTab() {
 
   return (
     <div className="stack">
-      <div className="segmented" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'upload'}
-          className={mode === 'upload' ? 'active' : ''}
-          onClick={() => setMode('upload')}
-        >
-          Unggah foto
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'webcam'}
-          className={mode === 'webcam' ? 'active' : ''}
-          onClick={() => setMode('webcam')}
-        >
-          Webcam
-        </button>
+      <div className="toolbar">
+        <div className="page-header">
+          <h2>Kenali Ekspresi</h2>
+          <p>Hasil membaca ekspresi di wajah, bukan perasaan seseorang. Foto tidak disimpan.</p>
+        </div>
+        <div className="segmented" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'upload'}
+            className={mode === 'upload' ? 'active' : ''}
+            onClick={() => setMode('upload')}
+          >
+            <UploadIcon size={18} />
+            Unggah foto
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'webcam'}
+            className={mode === 'webcam' ? 'active' : ''}
+            onClick={() => setMode('webcam')}
+          >
+            <CameraIcon size={18} />
+            Webcam
+          </button>
+        </div>
       </div>
 
       {mode === 'upload' ? <UploadMode /> : <WebcamMode />}
-
-      <p className="muted small">
-        Foto hanya diproses untuk prediksi dan tidak disimpan. Hasil ini membaca ekspresi di wajah, bukan perasaan
-        seseorang.
-      </p>
     </div>
   );
 }
