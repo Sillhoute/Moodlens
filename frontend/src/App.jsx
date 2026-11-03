@@ -26,9 +26,19 @@ export default function App() {
 
   return (
     <div className="page">
-      <header>
-        <h1>MoodLens</h1>
-        <p>Pengenalan ekspresi wajah dengan dua model deep learning.</p>
+      <header className="hero">
+        <div className="brand-mark" aria-hidden="true">M</div>
+        <div className="hero-copy">
+          <p className="eyebrow">STUDIO ANALISIS EKSPRESI</p>
+          <h1>MoodLens<span>.</span></h1>
+          <p className="hero-description">
+            Kenali ekspresi wajah dengan bantuan model deep learning.
+          </p>
+        </div>
+        <div className="hero-note">
+          <span className="status-dot" aria-hidden="true" />
+          <span>Privasi tetap terjaga</span>
+        </div>
       </header>
 
       <nav className="tabs" aria-label="Menu utama">
