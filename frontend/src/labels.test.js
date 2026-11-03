@@ -61,6 +61,10 @@ describe('boxToPercent', () => {
       height: '50%',
     });
   });
+
+  it('mencerminkan posisi kotak agar sesuai dengan video selfie', () => {
+    expect(boxToPercent({ x: 96, y: 42, w: 192, h: 210 }, 960, 420, { mirrored: true }).left).toBe('70%');
+  });
 });
 
 describe('errorMessage', () => {

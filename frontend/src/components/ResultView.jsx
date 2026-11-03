@@ -32,6 +32,33 @@ export function AnnotatedImage({ src, result, alt, scanning = false }) {
   );
 }
 
+export function LivePreview({ videoRef, result, scanning }) {
+  return (
+    <div className="preview live-preview">
+      <video ref={videoRef} className="mirrored" autoPlay playsInline muted />
+      {scanning && <div className="scanline" />}
+      {result?.faces.map((face) => (
+        <div
+          key={face.index}
+          className={face.jelas ? 'face-box' : 'face-box unclear'}
+          style={{
+            ...boxToPercent(face.box, result.image_width, result.image_height, { mirrored: true }),
+            '--face': faceColor(face),
+          }}
+        >
+          <i />
+          <i />
+          <i />
+          <i />
+          <span>
+            {face.index + 1}. {faceLabel(face)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ProbabilityBars({ probabilities, count }) {
   return (
     <ul className="bars">

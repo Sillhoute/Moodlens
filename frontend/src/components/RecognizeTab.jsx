@@ -1,25 +1,42 @@
 import { useEffect, useRef, useState } from 'react';
 import { predict } from '../api.js';
 import { CameraIcon, UploadIcon } from './Icons.jsx';
-import { AnnotatedImage, ResultPanel } from './ResultView.jsx';
+import { AnnotatedImage, LivePreview, ResultPanel } from './ResultView.jsx';
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_SNAPSHOT_WIDTH = 1280;
+const LIVE_ANALYSIS_INTERVAL_MS = 350;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const cameraErrorMessage = (err) =>
-  err.name === 'NotAllowedError'
-    ? 'Akses kamera ditolak. Izinkan kamera pada browser lalu coba lagi.'
-    : 'Kamera tidak dapat dibuka. Pastikan kamera tersedia dan tidak dipakai aplikasi lain.';
+  ({
+    NotAllowedError: 'Akses kamera ditolak. Izinkan kamera pada browser lalu coba lagi.',
+    NotFoundError: 'Kamera tidak ditemukan. Hubungkan kamera lalu coba lagi.',
+    NotReadableError: 'Kamera sedang dipakai aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.',
+    OverconstrainedError: 'Kamera tidak mendukung pengaturan yang diminta. Coba perangkat kamera lain.',
+    SecurityError: 'Webcam hanya bisa dipakai lewat localhost atau HTTPS.',
+  })[err.name] ?? 'Kamera tidak dapat dibuka. Pastikan kamera tersedia dan tidak dipakai aplikasi lain.';
 
 const captureSnapshot = (video) =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
+    if (!video.videoWidth || !video.videoHeight) {
+      reject(new Error('Kamera belum siap. Tunggu sampai video tampil lalu coba lagi.'));
+      return;
+    }
     const scale = Math.min(1, MAX_SNAPSHOT_WIDTH / video.videoWidth);
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(resolve, 'image/jpeg', 0.9);
+    const context = canvas.getContext('2d');
+    if (!context) {
+      reject(new Error('Browser tidak dapat menyiapkan gambar dari kamera.'));
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Browser tidak dapat mengambil frame dari kamera.'));
+    }, 'image/jpeg', 0.85);
   });
 
 function useAnalysis() {
@@ -134,6 +151,9 @@ function WebcamMode() {
   const videoRef = useRef(null);
   const [running, setRunning] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const [liveResult, setLiveResult] = useState(null);
+  const [liveError, setLiveError] = useState('');
+  const [liveScanning, setLiveScanning] = useState(false);
   const [snapshotUrl, setSnapshotUrl] = useState('');
   const { result, error, loading, analyse, reset } = useAnalysis();
 
@@ -146,35 +166,82 @@ function WebcamMode() {
     if (!running) return undefined;
     let stopped = false;
     let stream = null;
+    let timer = null;
+    const video = videoRef.current;
 
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'user' }, audio: false })
-      .then((mediaStream) => {
+    const analyseFrames = async () => {
+      if (stopped) return;
+      setLiveScanning(true);
+      let delay = LIVE_ANALYSIS_INTERVAL_MS;
+      try {
+        const snapshot = await captureSnapshot(video);
+        const response = await predict(snapshot, 'webcam', { saveHistory: false });
         if (stopped) {
-          mediaStream.getTracks().forEach((track) => track.stop());
           return;
         }
-        stream = mediaStream;
-        videoRef.current.srcObject = mediaStream;
-      })
-      .catch((err) => {
+        setLiveResult(response);
+        setLiveError('');
+      } catch (err) {
+        if (!stopped) {
+          setLiveError(err.message);
+          delay = 1000;
+        }
+      } finally {
+        if (!stopped) {
+          setLiveScanning(false);
+          timer = setTimeout(analyseFrames, delay);
+        }
+      }
+    };
+
+    const startCamera = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+        if (stopped) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        if (!video) throw new Error('Elemen video kamera tidak tersedia.');
+        video.srcObject = stream;
+        await video.play();
+
+        const videoReadyAt = Date.now();
+        while (!stopped && (!video.videoWidth || video.readyState < 2)) {
+          if (Date.now() - videoReadyAt >= 10000) {
+            throw new Error('Kamera menyala, tetapi belum mengirim video. Periksa izin kamera lalu coba lagi.');
+          }
+          await new Promise((resolve) => setTimeout(resolve, 80));
+        }
+        if (!stopped) await analyseFrames();
+      } catch (err) {
         if (stopped) return;
         setCameraError(cameraErrorMessage(err));
         setRunning(false);
-      });
+      }
+    };
+
+    startCamera();
 
     return () => {
       stopped = true;
+      clearTimeout(timer);
       stream?.getTracks().forEach((track) => track.stop());
+      if (video?.srcObject === stream) video.srcObject = null;
     };
   }, [running]);
 
   const handleCapture = async () => {
     const video = videoRef.current;
-    if (!video?.videoWidth) return;
-    const snapshot = await captureSnapshot(video);
-    setSnapshotUrl(URL.createObjectURL(snapshot));
-    analyse(snapshot, 'webcam');
+    try {
+      const snapshot = await captureSnapshot(video);
+      setSnapshotUrl(URL.createObjectURL(snapshot));
+      analyse(snapshot, 'webcam');
+    } catch (err) {
+      setLiveError(err.message);
+    }
   };
 
   const toggleCamera = () => {
@@ -182,6 +249,9 @@ function WebcamMode() {
     if (running) {
       reset();
       setSnapshotUrl('');
+      setLiveResult(null);
+      setLiveError('');
+      setLiveScanning(false);
     }
     setRunning((value) => !value);
   };
@@ -203,7 +273,9 @@ function WebcamMode() {
             <CameraIcon size={26} />
           </span>
           <strong>Kamera belum menyala</strong>
-          <p className="muted small">Setiap foto yang diambil disimpan hasilnya ke riwayat, bukan fotonya.</p>
+          <p className="muted small">
+            Ekspresi dianalisis langsung. Hasil hanya masuk riwayat saat Anda mengambil foto, bukan gambar aslinya.
+          </p>
           <button type="button" className="primary" onClick={toggleCamera}>
             Nyalakan kamera
           </button>
@@ -217,29 +289,33 @@ function WebcamMode() {
       <div className="camera-actions">
         <button type="button" className="primary" onClick={handleCapture} disabled={loading}>
           <CameraIcon size={18} />
-          {loading ? 'Menganalisis...' : 'Ambil foto dan kenali'}
+          {loading ? 'Menyimpan prediksi...' : 'Ambil foto dan simpan hasil'}
         </button>
         <button type="button" onClick={toggleCamera}>
           Matikan kamera
         </button>
       </div>
 
-      {error && (
+      {(error || liveError) && (
         <p className="error" role="alert">
-          {error}
+          {error || liveError}
         </p>
       )}
 
       <div className="result-layout">
         <div className="stack">
-          <div className="preview">
-            <video ref={videoRef} className="mirrored" autoPlay playsInline muted />
-          </div>
+          <LivePreview videoRef={videoRef} result={liveResult} scanning={liveScanning} />
           {snapshotUrl && (result || loading) && (
             <AnnotatedImage src={snapshotUrl} result={result} alt="Foto dari webcam" scanning={loading} />
           )}
         </div>
-        <ResultPanel result={result} loading={loading} />
+        <div className="stack">
+          <p className="live-status">
+            <span className="live-indicator" />
+            {liveScanning ? 'Kamera aktif · menganalisis frame' : 'Kamera aktif · analisis real-time'}
+          </p>
+          <ResultPanel result={liveResult} loading={!liveResult} />
+        </div>
       </div>
     </div>
   );

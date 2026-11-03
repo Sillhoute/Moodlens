@@ -75,10 +75,11 @@ export const login = async (data) => {
 export const logout = () => saveToken(null);
 export const getMe = () => request('/auth/me');
 
-export const predict = (image, source) => {
+export const predict = (image, source, { saveHistory = true } = {}) => {
   const form = new FormData();
   form.append('file', image, source === 'webcam' ? 'webcam.jpg' : image.name ?? 'foto.jpg');
   form.append('source', source);
+  form.append('save_history', String(saveHistory));
   return request('/predict', { method: 'POST', form });
 };
 

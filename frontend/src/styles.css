@@ -896,6 +896,27 @@ footer {
   gap: 10px;
 }
 
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.live-indicator {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  background: var(--success);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 16%, transparent);
+}
+
 /* ---------- Riwayat ---------- */
 
 .history-list {

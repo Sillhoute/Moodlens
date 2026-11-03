@@ -29,6 +29,7 @@ def ke_keluaran(pred: Prediction | None, hasil: dict, source: str) -> PrediksiOu
 async def predict(request: Request,
                   file: UploadFile = File(..., description="Foto JPG/PNG/WebP"),
                   source: str = Form("upload", pattern="^(upload|webcam)$"),
+                  save_history: bool = Form(True),
                   user: User = Depends(user_saat_ini),
                   db: Session = Depends(get_db)):
     data = await file.read()
@@ -42,7 +43,7 @@ async def predict(request: Request,
     hasil = await run_in_threadpool(pengenal.kenali, bgr)          # inferensi berat di luar event loop
 
     pred = None
-    if hasil["faces"]:                                            # hanya hasil (bukan foto) yang disimpan
+    if hasil["faces"] and save_history:                           # frame webcam langsung tidak memenuhi riwayat
         pred = Prediction(user_id=user.id, source=source, image_width=hasil["image_width"],
                           image_height=hasil["image_height"], n_faces=len(hasil["faces"]),
                           duration_ms=hasil["duration_ms"])

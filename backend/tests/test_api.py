@@ -39,10 +39,10 @@ def daftar_login(client, username, password="password123"):
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
-def kirim(client, header, nama, source="upload"):
+def kirim(client, header, nama, source="upload", save_history=True):
     with open(DATA / nama, "rb") as f:
         return client.post("/api/predict", headers=header, files={"file": (nama, f, "image/jpeg")},
-                           data={"source": source})
+                           data={"source": source, "save_history": str(save_history).lower()})
 
 
 def test_health(client):
@@ -103,6 +103,15 @@ def test_tanpa_wajah_tidak_disimpan(client):
     h = daftar_login(client, "citra")
     d = kirim(client, h, "tanpa_wajah.png", source="webcam").json()
     assert d["n_faces"] == 0 and d["id"] is None and "Tidak ada wajah" in d["message"]
+    assert client.get("/api/history", headers=h).json()["total"] == 0
+
+
+def test_frame_webcam_real_time_tidak_disimpan(client):
+    h = daftar_login(client, "dimas")
+    response = kirim(client, h, "tiga_wajah.jpg", source="webcam", save_history=False)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["n_faces"] == 3 and result["id"] is None
     assert client.get("/api/history", headers=h).json()["total"] == 0
 
 

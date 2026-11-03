@@ -15,7 +15,8 @@ Foto wajah hanya diproses di memori dan tidak disimpan. Database hanya menyimpan
 ## Fitur
 
 1. Daftar dan masuk dengan akun sendiri. Password disimpan sebagai hash bcrypt.
-2. Kenali ekspresi dari unggah foto atau webcam, termasuk foto berisi beberapa wajah.
+2. Kenali ekspresi dari unggah foto atau analisis webcam langsung, termasuk beberapa wajah. Frame webcam otomatis
+   hanya dipakai untuk prediksi; tekan tombol ambil foto untuk menyimpan satu hasil ke riwayat.
 3. Riwayat prediksi per akun, bisa dihapus satu per satu atau semuanya.
 4. Statistik: distribusi ekspresi, rata-rata keyakinan, dan jumlah prediksi per hari.
 5. Info model: akurasi, komponen ensemble, dan cara kerja, bisa dilihat tanpa login.

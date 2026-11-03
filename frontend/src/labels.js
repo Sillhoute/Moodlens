@@ -47,8 +47,8 @@ export const initials = (user) =>
     .join('');
 
 // Posisi kotak wajah dalam persen agar tetap pas saat gambar diskalakan oleh CSS.
-export const boxToPercent = (box, width, height) => ({
-  left: `${(box.x / width) * 100}%`,
+export const boxToPercent = (box, width, height, { mirrored = false } = {}) => ({
+  left: `${((mirrored ? width - box.x - box.w : box.x) / width) * 100}%`,
   top: `${(box.y / height) * 100}%`,
   width: `${(box.w / width) * 100}%`,
   height: `${(box.h / height) * 100}%`,
