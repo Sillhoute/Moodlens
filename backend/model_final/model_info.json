@@ -1,0 +1,71 @@
+{
+  "nama": "Ensemble CNN dari nol (Model A seed 1) + ResNet50 C2 (seed 3) - FER-2013",
+  "kelas": [
+    "angry",
+    "disgust",
+    "fear",
+    "happy",
+    "neutral",
+    "sad",
+    "surprise"
+  ],
+  "masukan": "wajah grayscale 48x48, float32, nilai piksel 0-255 TANPA normalisasi, bentuk (N, 48, 48, 1)",
+  "ensemble": "rata-rata probabilitas kedua model, bobot sama",
+  "tau": 0.5,
+  "aturan_tau": "jika probabilitas tertinggi < tau, tampilkan 'Ekspresi kurang jelas'",
+  "deteksi_wajah": {
+    "metode": "OpenCV FaceDetectorYN (YuNet 2023mar)",
+    "berkas": "face_detection_yunet_2023mar.onnx",
+    "skor_min": 0.7,
+    "nms": 0.3,
+    "ukuran_min_px": 40,
+    "margin": -0.05,
+    "resize": "grayscale lalu cv2.INTER_AREA ke 48x48"
+  },
+  "berkas": {
+    "model_a_seed1.keras": {
+      "sha256": "0f82bc3febc431bf285d714327ba40b46c8b7a60c4feb46fba0b0b695afe0a1d",
+      "ukuran_mb": 5.3
+    },
+    "resnet50_c2_seed3.keras": {
+      "sha256": "be61de447558ec20155c523f4865f93550dc497a31214390a331337f100dcb68",
+      "ukuran_mb": 95.1
+    },
+    "face_detection_yunet_2023mar.onnx": {
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+      "ukuran_mb": 0.2
+    }
+  },
+  "hasil_verifikasi": {
+    "Model A": {
+      "akurasi": 0.6112,
+      "macro_f1": 0.5696
+    },
+    "ResNet50 C2": {
+      "akurasi": 0.6257,
+      "macro_f1": 0.5969
+    },
+    "Ensemble": {
+      "akurasi": 0.6513,
+      "macro_f1": 0.6216
+    }
+  },
+  "tau_0_5": {
+    "cakupan": 0.6659,
+    "akurasi_dijawab": 0.7743
+  },
+  "cpu_ms_per_wajah": 62.1,
+  "versi": {
+    "python": "3.13.16",
+    "tensorflow": "2.21.0",
+    "keras": "3.13.2",
+    "numpy": "2.1.3",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.6.1",
+    "scipy": "1.16.3",
+    "matplotlib": "3.10.0",
+    "pillow": "11.3.0",
+    "opencv": "4.14.0",
+    "gpu": "Tesla T4, 15360 MiB"
+  }
+}

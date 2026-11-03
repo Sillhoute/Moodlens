@@ -1,31 +1,54 @@
 import { useEffect, useState } from 'react';
-import { getHealth } from './api.js';
-import AboutTab from './components/AboutTab.jsx';
-import CameraTab from './components/CameraTab.jsx';
+import { getMe, hasToken, logout, onUnauthorized } from './api.js';
+import AuthPage from './components/AuthPage.jsx';
 import HistoryTab from './components/HistoryTab.jsx';
-import PhotoTab from './components/PhotoTab.jsx';
+import ModelInfoTab from './components/ModelInfoTab.jsx';
+import RecognizeTab from './components/RecognizeTab.jsx';
+import StatsTab from './components/StatsTab.jsx';
+
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'local';
 
 const TABS = [
-  { id: 'photo', label: 'Foto', Component: PhotoTab },
-  { id: 'camera', label: 'Kamera', Component: CameraTab },
+  { id: 'recognize', label: 'Kenali Ekspresi', Component: RecognizeTab },
   { id: 'history', label: 'Riwayat', Component: HistoryTab },
-  { id: 'about', label: 'Tentang Model', Component: AboutTab },
+  { id: 'stats', label: 'Statistik', Component: StatsTab },
+  { id: 'model', label: 'Info Model', Component: ModelInfoTab },
 ];
 
 export default function App() {
-  const [activeId, setActiveId] = useState('photo');
-  const [version, setVersion] = useState('');
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(hasToken());
+  const [activeId, setActiveId] = useState('recognize');
+  const [sessionMessage, setSessionMessage] = useState('');
 
   useEffect(() => {
-    getHealth()
-      .then((health) => setVersion(health.version))
-      .catch(() => {});
+    onUnauthorized(() => {
+      setUser(null);
+      setSessionMessage('Sesi login sudah berakhir. Silakan masuk lagi.');
+    });
+    if (!hasToken()) return;
+    getMe()
+      .then(setUser)
+      .catch(() => {})
+      .finally(() => setChecking(false));
   }, []);
+
+  const handleLogin = (loggedInUser) => {
+    setUser(loggedInUser);
+    setSessionMessage('');
+    setActiveId('recognize');
+  };
+
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+  };
 
   const { Component } = TABS.find((tab) => tab.id === activeId);
 
   return (
     <div className="page">
+<<<<<<< HEAD
       <header className="hero">
         <div className="brand-mark" aria-hidden="true">M</div>
         <div className="hero-copy">
@@ -39,27 +62,49 @@ export default function App() {
           <span className="status-dot" aria-hidden="true" />
           <span>Privasi tetap terjaga</span>
         </div>
+=======
+      <header className="app-header">
+        <div>
+          <h1>FER Ensemble</h1>
+          <p>Pengenalan ekspresi wajah dengan ensemble CNN dan ResNet50.</p>
+        </div>
+        {user && (
+          <div className="user-menu">
+            <span>{user.full_name || user.username}</span>
+            <button type="button" onClick={handleLogout}>
+              Keluar
+            </button>
+          </div>
+        )}
+>>>>>>> 9cf66ed2e2d59d54fa13e0b2f0d78ea92ae2a6b3
       </header>
 
-      <nav className="tabs" aria-label="Menu utama">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={tab.id === activeId ? 'tab active' : 'tab'}
-            aria-current={tab.id === activeId ? 'page' : undefined}
-            onClick={() => setActiveId(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      {checking ? (
+        <p className="muted">Memuat...</p>
+      ) : user ? (
+        <>
+          <nav className="tabs" aria-label="Menu utama">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={tab.id === activeId ? 'tab active' : 'tab'}
+                aria-current={tab.id === activeId ? 'page' : undefined}
+                onClick={() => setActiveId(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+          <main>
+            <Component />
+          </main>
+        </>
+      ) : (
+        <AuthPage onLogin={handleLogin} message={sessionMessage} />
+      )}
 
-      <main>
-        <Component />
-      </main>
-
-      <footer>Versi deploy: {version || '-'}</footer>
+      <footer>Versi deploy: {APP_VERSION}</footer>
     </div>
   );
 }

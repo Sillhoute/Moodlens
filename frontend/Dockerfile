@@ -4,6 +4,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# Commit SHA dari pipeline CI ditampilkan sebagai "Versi deploy" di halaman.
+ARG APP_VERSION=local
+ENV VITE_APP_VERSION=$APP_VERSION
 RUN npm run build
 
 # Tahap 2: image akhir hanya berisi Nginx dan hasil build, tanpa Node.js
