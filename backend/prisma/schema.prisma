@@ -1,0 +1,52 @@
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+model User {
+    id           Int          @id @default(autoincrement())
+    username     String       @unique @db.VarChar(50)
+    passwordHash String       @map("password_hash") @db.VarChar(255)
+    createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+    predictions  Prediction[]
+
+    @@map("users")
+}
+
+model Prediction {
+    id          Int              @id @default(autoincrement())
+    userId      Int              @map("user_id")
+    user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    source      String           @db.VarChar(10) // 'upload' | 'webcam'
+    imageWidth  Int?             @map("image_width")
+    imageHeight Int?             @map("image_height")
+    nFaces      Int              @map("n_faces")
+    durationMs  Float?           @map("duration_ms")
+    createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+    faces       PredictionFace[]
+
+    @@index([userId], map: "ix_predictions_user_id")
+    @@index([userId, createdAt(sort: Desc)], map: "ix_predictions_user_waktu")
+    @@map("predictions")
+}
+
+model PredictionFace {
+    id            Int        @id @default(autoincrement())
+    predictionId  Int        @map("prediction_id")
+    prediction    Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+    faceIndex     Int        @map("face_index") @db.SmallInt
+    boxX          Int        @map("box_x")
+    boxY          Int        @map("box_y")
+    boxW          Int        @map("box_w")
+    boxH          Int        @map("box_h")
+    topLabel      String     @map("top_label") @db.VarChar(10)
+    confidence    Float
+    probabilities Json       @db.JsonB // Menyimpan probabilitas lengkap ke-7 kelas
+
+    @@index([predictionId], map: "ix_prediction_faces_prediction_id")
+    @@map("prediction_faces")
+}
