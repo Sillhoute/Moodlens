@@ -61,14 +61,11 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Build dan push hanya berjalan untuk kode yang sudah masuk ke main, bukan pull request.
+  # Build di VM GitHub lalu push ke Docker Hub. Hanya untuk kode yang sudah masuk ke main.
   build-and-push:
     needs: [test-backend, test-frontend]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     strategy:
       matrix:
         service: [frontend, backend, database]
@@ -77,13 +74,13 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          # Docker Hub hanya mengenal satu tingkat nama: <username>/<repository>.
+          images: docker.io/${{ vars.DOCKERHUB_USERNAME }}/fer-ensemble-${{ matrix.service }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=raw,value=latest
@@ -102,11 +99,9 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: [self-hosted, Windows]
-    permissions:
-      contents: read
-      packages: read
     env:
       IMAGE_TAG: ${{ github.sha }}
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       APP_PORT: 8088
@@ -117,9 +112,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Hentikan versi aplikasi sebelumnya
         run: |
           # Versi MoodLens memakai nama proyek lain dan port yang sama. Datanya tidak dihapus.
@@ -131,7 +125,7 @@ jobs:
           # Docker menulis progres ke stderr, jadi kegagalan dicek dari exit code.
           $ErrorActionPreference = 'Continue'
           # Nama image di registry wajib huruf kecil.
-          $env:IMAGE_PREFIX = "ghcr.io/$($env:GITHUB_REPOSITORY.ToLower())"
+          $env:IMAGE_PREFIX = "docker.io/$($env:DOCKERHUB_USERNAME.ToLower())/fer-ensemble"
           $env:POSTGRES_PASSWORD_URL = [uri]::EscapeDataString($env:POSTGRES_PASSWORD)
           docker compose pull frontend backend database
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

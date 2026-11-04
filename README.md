@@ -80,10 +80,10 @@ Workflow ada di `.github/workflows/ci-cd.yml`.
 
 1. **Test** (setiap push dan pull request ke `main`): test backend dengan model asli terhadap PostgreSQL,
    serta test dan build frontend.
-2. **Build dan push** (hanya push ke `main`): ketiga image dikirim ke GitHub Container Registry dengan tag
-   commit SHA dan `latest`.
-3. **Deploy** (hanya push ke `main`): self-hosted runner menarik image dan menjalankan `docker compose up`,
-   lalu smoke test ke `/api/health` dan `/api/model-info`.
+2. **Build dan push** (hanya push ke `main`): ketiga image di-build di VM GitHub, lalu dikirim ke Docker Hub
+   sebagai `<username>/fer-ensemble-frontend`, `-backend`, dan `-database`, dengan tag commit SHA dan `latest`.
+3. **Deploy** (hanya push ke `main`): self-hosted runner menarik image terbaru dari Docker Hub dan menjalankan
+   `docker compose up`, lalu smoke test ke `/api/health` dan `/api/model-info`.
 
 Versi yang sedang berjalan tampil di bagian bawah halaman aplikasi.
 
@@ -92,12 +92,21 @@ Versi yang sedang berjalan tampil di bagian bawah halaman aplikasi.
 1. Buat repository GitHub **private**. Self-hosted runner pada repository publik bisa menjalankan kode
    dari pull request orang lain di laptop Anda.
 2. Push kode ini ke branch `main`.
-3. Tambahkan secret `POSTGRES_PASSWORD` dan `JWT_SECRET` (string acak minimal 32 karakter) di
-   **Settings > Secrets and variables > Actions**.
-4. Buka **Settings > Actions > Runners > New self-hosted runner**, pilih Windows x64, lalu ikuti perintah
+3. Di [Docker Hub](https://hub.docker.com), buka **Account settings > Personal access tokens**, lalu buat token
+   dengan izin **Read & Write**.
+4. Di **Settings > Secrets and variables > Actions**:
+   - tab **Secrets**: tambahkan `DOCKERHUB_TOKEN` (token dari langkah 3), `POSTGRES_PASSWORD`, dan
+     `JWT_SECRET` (string acak minimal 32 karakter);
+   - tab **Variables**: tambahkan `DOCKERHUB_USERNAME` berisi username Docker Hub. Disimpan sebagai variable,
+     bukan secret, agar nama image tetap terbaca di log Actions.
+5. Buka **Settings > Actions > Runners > New self-hosted runner**, pilih Windows x64, lalu ikuti perintah
    unduh dan `config.cmd` yang ditampilkan GitHub.
-5. Jalankan `run.cmd` memakai akun Windows yang sama dengan Docker Desktop, bukan sebagai service.
-6. Push commit baru, lalu pantau hasilnya di tab **Actions**.
+6. Jalankan `run.cmd` memakai akun Windows yang sama dengan Docker Desktop, bukan sebagai service.
+7. Push commit baru, lalu pantau hasilnya di tab **Actions**.
+
+Docker Hub otomatis membuat repository **publik** saat image pertama di-push. Akun gratis hanya mendapat satu
+repository private, jadi ketiga image dapat ditarik oleh siapa pun. Image tidak berisi password atau secret,
+karena semuanya baru diberikan saat container dijalankan.
 
 Laptop harus menyala dengan Docker Desktop dan `run.cmd` aktif saat deploy. Jika tidak, job `deploy`
 menunggu sampai runner kembali online.

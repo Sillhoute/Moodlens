@@ -2,7 +2,7 @@ name: fer-ensemble
 
 services:
   frontend:
-    image: ${IMAGE_PREFIX:-fer-ensemble}/frontend:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-fer-ensemble}-frontend:${IMAGE_TAG:-local}
     build:
       context: ./frontend
       args:
@@ -22,7 +22,7 @@ services:
       - web
 
   backend:
-    image: ${IMAGE_PREFIX:-fer-ensemble}/backend:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-fer-ensemble}-backend:${IMAGE_TAG:-local}
     build: ./backend
     restart: unless-stopped
     environment:
@@ -45,7 +45,7 @@ services:
       - data
 
   database:
-    image: ${IMAGE_PREFIX:-fer-ensemble}/database:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-fer-ensemble}-database:${IMAGE_TAG:-local}
     build: ./database
     restart: unless-stopped
     environment:
