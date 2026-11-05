@@ -1,10 +1,7 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 import { prisma } from "../config/prisma";
-import { mlService } from "../services/ml.service";
-import { FaceDetectorService } from "../services/face.service";
-
-const faceDetector = new FaceDetectorService();
+import { runNativePrediction } from "../services/nativeMl.service";
 
 export async function predict(req: AuthenticatedRequest, res: Response) {
   if (!req.file) {
@@ -12,54 +9,30 @@ export async function predict(req: AuthenticatedRequest, res: Response) {
   }
 
   const source = (req.body.source || "upload").toLowerCase();
-  const saveHistory =
-    req.body.save_history !== "false" && req.body.save_history !== false;
+  const saveHistoryRequested = req.body.save_history !== "false";
+  const shouldSaveHistory = Boolean(saveHistoryRequested && req.user?.userId);
+
   const t0 = Date.now();
 
   try {
-    const { faces, imageWidth, imageHeight } =
-      await faceDetector.detectAndCropFaces(req.file.buffer);
-
-    if (faces.length === 0) {
-      return res.json({
-        id: null,
-        source,
-        n_faces: 0,
-        image_width: imageWidth,
-        image_height: imageHeight,
-        duration_ms: Date.now() - t0,
-        faces: [],
-        message:
-          "Tidak ada wajah terdeteksi. Pastikan wajah menghadap kamera dan cukup terang.",
-      });
-    }
-
-    const faceResults = faces.map((f) => {
-      const pred = mlService.predict(f.imageTensor);
-      f.imageTensor.dispose(); // Bebaskan memori tensor
-      return {
-        index: f.index,
-        box: f.box,
-        top_label: pred.topLabel,
-        confidence: pred.confidence,
-        probabilities: pred.probabilities,
-      };
-    });
-
+    // Panggil fungsi Python langsung di dalam backend Express
+    const hasil = await runNativePrediction(req.file.buffer);
     const durationMs = Date.now() - t0;
-    let predictionRecord = null;
+    hasil.duration_ms = durationMs;
+    hasil.source = source;
 
-    if (saveHistory) {
+    let predictionRecord = null;
+    if (shouldSaveHistory && req.user?.userId && hasil.faces.length > 0) {
       predictionRecord = await prisma.prediction.create({
         data: {
-          userId: req.user!.userId,
+          userId: req.user.userId,
           source,
-          imageWidth,
-          imageHeight,
-          nFaces: faces.length,
+          imageWidth: hasil.image_width,
+          imageHeight: hasil.image_height,
+          nFaces: hasil.n_faces,
           durationMs,
           faces: {
-            create: faceResults.map((fr) => ({
+            create: hasil.faces.map((fr: any) => ({
               faceIndex: fr.index,
               boxX: fr.box.x,
               boxY: fr.box.y,
@@ -72,22 +45,15 @@ export async function predict(req: AuthenticatedRequest, res: Response) {
           },
         },
       });
+      hasil.id = predictionRecord.id;
+      hasil.created_at = predictionRecord.createdAt;
     }
 
-    return res.json({
-      id: predictionRecord ? predictionRecord.id : null,
-      source,
-      created_at: predictionRecord ? predictionRecord.createdAt : new Date(),
-      image_width: imageWidth,
-      image_height: imageHeight,
-      n_faces: faces.length,
-      duration_ms: durationMs,
-      faces: faceResults,
-      message: `${faces.length} wajah terdeteksi.`,
-    });
+    return res.json(hasil);
   } catch (error: any) {
+    console.error("Error menjalankan native model:", error.message);
     return res
       .status(500)
-      .json({ message: "Gagal memproses gambar", error: error.message });
+      .json({ message: "Gagal memproses prediksi", error: error.message });
   }
 }
