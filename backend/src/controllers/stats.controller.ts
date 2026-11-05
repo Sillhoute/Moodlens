@@ -1,7 +1,16 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 import { prisma } from "../config/prisma";
-import { EMOTION_CLASSES } from "../services/ml.service";
+
+export const EMOTION_CLASSES = [
+  "angry",
+  "disgust",
+  "fear",
+  "happy",
+  "sad",
+  "surprise",
+  "neutral",
+];
 
 export async function getStats(req: AuthenticatedRequest, res: Response) {
   const userId = req.user!.userId;
@@ -29,7 +38,6 @@ export async function getStats(req: AuthenticatedRequest, res: Response) {
   const totalPrediksi = predictions.length;
   const totalWajah = allFaces.length;
 
-  // Hitung distribusi label & statistik keyakinan
   const distributionMap: Record<string, number> = {};
   EMOTION_CLASSES.forEach((c) => (distributionMap[c] = 0));
 
@@ -42,13 +50,11 @@ export async function getStats(req: AuthenticatedRequest, res: Response) {
   const rataRataKeyakinan =
     totalWajah > 0 ? Number((totalConfidence / totalWajah).toFixed(4)) : null;
 
-  // Hitung sumber (upload vs webcam)
   const perSumber: Record<string, number> = {};
   predictions.forEach((p) => {
     perSumber[p.source] = (perSumber[p.source] || 0) + 1;
   });
 
-  // Cari ekspresi terbanyak
   let ekspresiTerbanyak: string | null = null;
   let maxCount = -1;
   Object.entries(distributionMap).forEach(([label, count]) => {
@@ -58,7 +64,6 @@ export async function getStats(req: AuthenticatedRequest, res: Response) {
     }
   });
 
-  // Tren harian (WIB / UTC+7)
   const hariIni = new Date();
   const trenHarian: Array<{ tanggal: string; jumlah: number }> = [];
 

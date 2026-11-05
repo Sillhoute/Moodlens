@@ -5,16 +5,14 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 from tensorflow.keras.applications import ResNet50
-
-# Matikan log TF yang berisik
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 EMOTION_CLASSES = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
 IMG_HEIGHT, IMG_WIDTH = 48, 48
 NEW_IMG_SIZE = 96
 
-# Definisi Kelas Arsitektur Sesuai Colab Kamu
 class ResidualBlock(layers.Layer):
     def __init__(self, filters, stride=1, **kwargs):
         super(ResidualBlock, self).__init__(**kwargs)
@@ -151,6 +149,10 @@ def process_image(image_path):
     }
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print(json.dumps({"error": "Path gambar tidak disertakan"}))
+        sys.exit(1)
+    
     img_path = sys.argv[1]
     result = process_image(img_path)
     print(json.dumps(result))
