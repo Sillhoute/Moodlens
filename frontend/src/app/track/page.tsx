@@ -1,7 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { guestStorage, HistoryRecord } from "@/lib/guestStorage";
@@ -24,9 +25,9 @@ import {
   ChevronRight,
   BarChart3,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 
-// Interface untuk struktur data face / wajah dari backend
 interface FaceResult {
   index: number;
   box: { x: number; y: number; w: number; h: number };
@@ -36,7 +37,6 @@ interface FaceResult {
   jelas: boolean;
 }
 
-// Interface untuk item prediksi dari API backend
 interface PredictionItem {
   id: number;
   source?: string;
@@ -44,13 +44,11 @@ interface PredictionItem {
   faces?: FaceResult[];
 }
 
-// Interface untuk response API history
 interface HistoryApiResponse {
   total: number;
   items: PredictionItem[];
 }
 
-// Interface untuk response API stats
 interface StatsApiResponse {
   total_prediksi: number;
   total_wajah: number;
@@ -63,12 +61,10 @@ interface StatsApiResponse {
 export default function TrackPage() {
   const { data: session } = useSession();
 
-  // State Statistik
   const [statsDays, setStatsDays] = useState<number>(14);
   const [statsData, setStatsData] = useState<StatsApiResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // State Riwayat (History) dengan Pagination & Limit
   const [historyItems, setHistoryItems] = useState<HistoryRecord[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyLimit, setHistoryLimit] = useState<number>(10);
@@ -76,17 +72,16 @@ export default function TrackPage() {
   const [historyLoading, setHistoryLoading] = useState(true);
 
   // Load Statistik
-  const loadStats = useCallback(async () => {
+  const loadStats = async (days = statsDays) => {
     setStatsLoading(true);
     if (session) {
       try {
-        const res = (await fetchStats(statsDays)) as StatsApiResponse;
+        const res = (await fetchStats(days)) as StatsApiResponse;
         setStatsData(res);
       } catch (err) {
         handleError(err);
       }
     } else {
-      // Statistik untuk Mode Guest dari sessionStorage
       const localHistory = guestStorage.getHistory();
       const totalPrediksi = localHistory.length;
       let totalConf = 0;
@@ -120,10 +115,9 @@ export default function TrackPage() {
         }
       });
 
-      // Filter tren harian sesuai statsDays
       const today = new Date();
       const tren: Array<{ tanggal: string; jumlah: number }> = [];
-      for (let i = statsDays - 1; i >= 0; i--) {
+      for (let i = days - 1; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split("T")[0];
@@ -146,17 +140,14 @@ export default function TrackPage() {
       });
     }
     setStatsLoading(false);
-  }, [session, statsDays]);
+  };
 
   // Load Riwayat
-  const loadHistory = useCallback(async () => {
+  const loadHistory = async (offset = historyOffset, limit = historyLimit) => {
     setHistoryLoading(true);
     if (session) {
       try {
-        const res = (await fetchHistory(
-          historyOffset,
-          historyLimit,
-        )) as HistoryApiResponse;
+        const res = (await fetchHistory(offset, limit)) as HistoryApiResponse;
         const formatted: HistoryRecord[] = (res.items || []).map((p) => ({
           id: String(p.id),
           imagePreview: "",
@@ -171,27 +162,26 @@ export default function TrackPage() {
         handleError(err);
       }
     } else {
-      // Mode Guest dari sessionStorage
       const localHistory = guestStorage.getHistory();
       setHistoryTotal(localHistory.length);
-      const sliced = localHistory.slice(
-        historyOffset,
-        historyOffset + historyLimit,
-      );
+      const sliced = localHistory.slice(offset, offset + limit);
       setHistoryItems(sliced);
     }
     setHistoryLoading(false);
-  }, [session, historyOffset, historyLimit]);
+  };
 
+  // HANYA dipanggil sekali saat halaman pertama kali dibuka (mount)
   useEffect(() => {
     loadStats();
-  }, [loadStats]);
-
-  useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+  }, []);
 
-  // Hapus Satu Riwayat
+  const handleRefreshAll = () => {
+    loadStats();
+    loadHistory();
+    showToast.success("Data berhasil diperbarui");
+  };
+
   const handleDeleteItem = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus riwayat ini?")) return;
     if (session) {
@@ -213,7 +203,6 @@ export default function TrackPage() {
     }
   };
 
-  // Bersihkan Semua Riwayat
   const handleClearAll = async () => {
     if (
       !confirm(
@@ -255,25 +244,37 @@ export default function TrackPage() {
           </p>
         </div>
 
-        {/* Filter Hari untuk Statistik */}
-        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5 shadow-sm">
-          <Calendar className="h-4 w-4 text-primary ml-2" />
-          <span className="text-xs font-semibold text-muted-foreground">
-            Periode:
-          </span>
-          {[7, 14, 30].map((days) => (
-            <button
-              key={days}
-              onClick={() => setStatsDays(days)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                statsDays === days
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {days} Hari
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefreshAll}
+            className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all"
+          >
+            <RefreshCw className="h-3.5 w-3.5 text-primary" />
+            <span>Refresh</span>
+          </button>
+
+          <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5 shadow-sm">
+            <Calendar className="h-4 w-4 text-primary ml-2" />
+            <span className="text-xs font-semibold text-muted-foreground">
+              Periode:
+            </span>
+            {[7, 14, 30].map((days) => (
+              <button
+                key={days}
+                onClick={() => {
+                  setStatsDays(days);
+                  loadStats(days);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  statsDays === days
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {days} Hari
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -343,7 +344,6 @@ export default function TrackPage() {
 
       {/* Distribusi Emosi & Tren Harian */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Distribusi Kelas FER */}
         <div className="rounded-3xl border border-border bg-card p-6 shadow-xl space-y-4">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-primary" />
@@ -381,7 +381,6 @@ export default function TrackPage() {
           )}
         </div>
 
-        {/* Tren Harian */}
         <div className="rounded-3xl border border-border bg-card p-6 shadow-xl space-y-4">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-accent-2" />
@@ -443,14 +442,15 @@ export default function TrackPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Pilihan Limit */}
             <div className="flex items-center gap-2 text-xs">
               <span className="text-muted-foreground font-medium">Tampil:</span>
               <select
                 value={historyLimit}
                 onChange={(e) => {
-                  setHistoryLimit(parseInt(e.target.value, 10));
+                  const newLimit = parseInt(e.target.value, 10);
+                  setHistoryLimit(newLimit);
                   setHistoryOffset(0);
+                  loadHistory(0, newLimit);
                 }}
                 className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
@@ -546,7 +546,6 @@ export default function TrackPage() {
           </div>
         )}
 
-        {/* Pagination Controls */}
         {historyTotal > historyLimit && (
           <div className="flex items-center justify-between pt-4 border-t border-border">
             <span className="text-xs text-muted-foreground">
@@ -556,9 +555,11 @@ export default function TrackPage() {
             </span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() =>
-                  setHistoryOffset(Math.max(0, historyOffset - historyLimit))
-                }
+                onClick={() => {
+                  const newOffset = Math.max(0, historyOffset - historyLimit);
+                  setHistoryOffset(newOffset);
+                  loadHistory(newOffset, historyLimit);
+                }}
                 disabled={historyOffset === 0}
                 className="flex items-center gap-1 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
               >
@@ -569,7 +570,11 @@ export default function TrackPage() {
                 Hal {currentPage} / {totalPages}
               </span>
               <button
-                onClick={() => setHistoryOffset(historyOffset + historyLimit)}
+                onClick={() => {
+                  const newOffset = historyOffset + historyLimit;
+                  setHistoryOffset(newOffset);
+                  loadHistory(newOffset, historyLimit);
+                }}
                 disabled={historyOffset + historyLimit >= historyTotal}
                 className="flex items-center gap-1 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
               >

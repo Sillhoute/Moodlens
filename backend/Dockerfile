@@ -39,8 +39,8 @@ RUN bun run db:generate
 # Build TypeScript ke JavaScript
 RUN bun run build || true
 
-# Ekspose port backend Express (Sesuaikan ke 9000)
+# Ekspose port internal backend sesuai file .env (port 9000)
 EXPOSE 9000
 
-# Jalankan server
-CMD ["bun", "run", "start"]
+# Jalankan migrasi database saat start, lalu jalankan server
+CMD ["sh", "-c", "bun run db:push && bun run start"]
