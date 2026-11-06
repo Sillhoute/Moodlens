@@ -2,7 +2,13 @@
 /* eslint-disable react-hooks/immutability */
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  Suspense,
+} from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { guestStorage } from "@/lib/guestStorage";
@@ -22,44 +28,38 @@ import {
   VideoOff,
   Play,
   Square,
+  Loader2,
 } from "lucide-react";
 
-const LIVE_INTERVAL_MS = 400; // Interval frame stream (~400ms)
+const LIVE_INTERVAL_MS = 400;
 
-export default function PredictionPage() {
+function PredictionContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
 
-  // Tab State: 'upload' atau 'webcam'
   const initialMode =
     searchParams.get("mode") === "webcam" ? "webcam" : "upload";
   const [activeTab, setActiveTab] = useState<"upload" | "webcam">(initialMode);
 
-  // Model Selection State
   const [selectedModel, setSelectedModel] = useState<
     "ensemble" | "vanilla" | "resnet50"
   >("resnet50");
 
-  // Input & Preview States
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Webcam States
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Real-time Stream Loop Control
   const [isRealtime, setIsRealtime] = useState(false);
   const isAnalyzingRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Prediction Status & Result
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
 
-  // Stop Real-time Streaming
   const stopRealtime = useCallback(() => {
     setIsRealtime(false);
     if (timerRef.current) {
@@ -69,7 +69,6 @@ export default function PredictionPage() {
     isAnalyzingRef.current = false;
   }, []);
 
-  // Stop Camera & Cleanup Stream
   const stopCamera = useCallback(() => {
     stopRealtime();
     if (streamRef.current) {
@@ -82,7 +81,6 @@ export default function PredictionPage() {
     setIsCameraActive(false);
   }, [stopRealtime]);
 
-  // Start Camera
   const startCamera = useCallback(async () => {
     stopCamera();
     try {
@@ -108,7 +106,6 @@ export default function PredictionPage() {
     }
   }, [stopCamera]);
 
-  // Cleanup saat unmount atau berpindah tab
   useEffect(() => {
     if (activeTab !== "webcam") {
       stopCamera();
@@ -118,7 +115,6 @@ export default function PredictionPage() {
     };
   }, [activeTab, stopCamera]);
 
-  // Tangkap snapshot frame dari webcam
   const captureSnapshot = useCallback((): Promise<File | null> => {
     return new Promise((resolve) => {
       const video = videoRef.current;
@@ -150,7 +146,6 @@ export default function PredictionPage() {
     });
   }, []);
 
-  // Eksekusi Prediksi Frame
   const runAnalysis = useCallback(
     async (isLooping = false) => {
       if (isAnalyzingRef.current && isLooping) return;
@@ -210,7 +205,6 @@ export default function PredictionPage() {
     ],
   );
 
-  // Real-time Loop Controller (Recursive setTimeout)
   useEffect(() => {
     let isActive = true;
 
@@ -304,7 +298,6 @@ export default function PredictionPage() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
-      {/* Header Halaman */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-gradient-brand">
@@ -316,7 +309,6 @@ export default function PredictionPage() {
           </p>
         </div>
 
-        {/* Pemilihan Model */}
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5 shadow-sm self-start md:self-auto">
           <Layers className="h-4 w-4 text-primary ml-2" />
           <span className="text-xs font-semibold text-muted-foreground mr-1 hidden sm:inline">
@@ -345,7 +337,6 @@ export default function PredictionPage() {
         </div>
       </div>
 
-      {/* Navigasi Tab (Upload vs Camera) */}
       <div className="flex rounded-2xl border border-border bg-card p-1 shadow-md max-w-md mx-auto">
         <button
           onClick={() => {
@@ -377,9 +368,7 @@ export default function PredictionPage() {
         </button>
       </div>
 
-      {/* Area Input & Visualisasi Hasil */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        {/* Kolom Kiri: Input Zone */}
         <div className="rounded-3xl border border-border bg-card p-6 shadow-xl space-y-4">
           <h2 className="text-base font-bold text-foreground flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -421,7 +410,6 @@ export default function PredictionPage() {
                     alt="Preview Wajah"
                     className="max-w-full max-h-full object-contain rounded-xl"
                   />
-                  {/* Overlay Bounding Box Wajah (Upload) */}
                   {prediction &&
                     prediction.faces.map((face) => {
                       const left = (face.box.x / prediction.image_width) * 100;
@@ -464,7 +452,6 @@ export default function PredictionPage() {
               )}
             </div>
           ) : (
-            /* Tab Kamera / Webcam */
             <div className="space-y-3">
               <div className="relative rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-border">
                 <video
@@ -477,7 +464,6 @@ export default function PredictionPage() {
                   }`}
                 />
 
-                {/* Overlaid Bounding Box Wajah (Webcam Mirrored secara Proporsional) */}
                 {isCameraActive &&
                   prediction &&
                   prediction.faces.map((face) => {
@@ -521,7 +507,6 @@ export default function PredictionPage() {
                 )}
               </div>
 
-              {/* Kontrol Kamera & Realtime */}
               <div className="grid grid-cols-2 gap-2">
                 {isCameraActive ? (
                   <button
@@ -569,7 +554,6 @@ export default function PredictionPage() {
             </div>
           )}
 
-          {/* Action Buttons (Single Capture) */}
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => runAnalysis(false)}
@@ -606,7 +590,6 @@ export default function PredictionPage() {
           </div>
         </div>
 
-        {/* Kolom Kanan: Visualisasi Hasil Deteksi */}
         <div className="rounded-3xl border border-border bg-card p-6 shadow-xl space-y-4 min-h-[360px]">
           <h2 className="text-base font-bold text-foreground flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -644,7 +627,6 @@ export default function PredictionPage() {
             </div>
           ) : (
             <div className="space-y-5">
-              {/* Top Predicted Emotion */}
               {mainFace && (
                 <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4 flex items-center justify-between">
                   <div>
@@ -666,7 +648,6 @@ export default function PredictionPage() {
                 </div>
               )}
 
-              {/* Progress Bars 7 Emosi */}
               {mainFace && mainFace.probabilities && (
                 <div className="space-y-2.5 pt-1">
                   <span className="text-xs font-bold text-foreground">
@@ -698,7 +679,6 @@ export default function PredictionPage() {
                 </div>
               )}
 
-              {/* Status Sesi Banner */}
               <div className="pt-2">
                 {session ? (
                   <p className="text-[11px] text-success flex items-center gap-1.5 font-medium">
@@ -720,5 +700,19 @@ export default function PredictionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PredictionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <PredictionContent />
+    </Suspense>
   );
 }

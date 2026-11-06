@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  # 1. Container PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: moodlens-db
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
+    ports:
+      - "5434:5432" # Port lokal 5434 memetakan ke port internal 5432 database
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fer_network
+
+  # 2. Container Backend Express.js + Python ML
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: moodlens-backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=9000
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?schema=public
+    ports:
+      - "9000:9000"
+    depends_on:
+      - database
+    networks:
+      - fer_network
+
+  # 3. Container Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: moodlens-frontend
+    restart: always
+    env_file:
+      - ./frontend/.env
+    environment:
+      - PORT=4000
+      - NEXT_PUBLIC_API_URL=http://localhost:9000/api
+    ports:
+      - "4000:4000"
+    depends_on:
+      - backend
+    networks:
+      - fer_network
+
+volumes:
+  postgres_data:
+
+networks:
+  fer_network:
+    driver: bridge
