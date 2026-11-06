@@ -96,7 +96,12 @@ resnet_model = OOPResNet50FERModel(num_classes=7)
 resnet_model(tf.zeros((1, IMG_HEIGHT, IMG_WIDTH, 1)))
 resnet_model.load_weights(os.path.join(base_dir, "model", "best_resnet_fer.weights.h5"))
 
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+cascade_path = os.path.join(base_dir, "model", "haarcascade_frontalface_default.xml")
+
+face_cascade = cv2.CascadeClassifier(cascade_path)
+if face_cascade.empty():
+    print(f"[Python Worker] ❌ Gagal memuat HaarCascade dari: {cascade_path}", file=sys.stderr)
+    sys.exit(1)
 
 def process_image(image_path):
     bgr = cv2.imread(image_path)

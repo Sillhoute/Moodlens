@@ -1,23 +1,15 @@
 import sys
 import subprocess
 import importlib.util
+import os
 
-required_packages = {
-    "tensorflow": "tensorflow",
-    "cv2": "opencv-python-headless",
-    "numpy": "numpy"
-}
+print("[Python Env] 🔍 Memeriksa dependensi Python di Virtual Environment...", file=sys.stderr)
 
-print("[Python Env] 🔍 Memeriksa dependensi Python...", file=sys.stderr)
+required_packages = ["tensorflow", "numpy", "cv2"]
 
-for module_name, package_name in required_packages.items():
-    if importlib.util.find_spec(module_name) is None:
-        print(f"[Python Env] 📦 Pustaka '{package_name}' belum ada. Menginstal sekali di awal...", file=sys.stderr)
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", package_name])
-            print(f"[Python Env] ✅ Berhasil menginstal {package_name}", file=sys.stderr)
-        except Exception as e:
-            print(f"[Python Env] ❌ Gagal menginstal {package_name}: {e}", file=sys.stderr)
-            sys.exit(1)
+for pkg in required_packages:
+    if importlib.util.find_spec(pkg) is None:
+        print(f"[Python Env] ❌ Pustaka '{pkg}' belum terpasang di venv.", file=sys.stderr)
+        sys.exit(1)
 
-print("[Python Env] ✨ Semua dependensi Python lengkap!", file=sys.stderr)
+print("[Python Env] ✨ Semua dependensi Python di venv lengkap & siap!", file=sys.stderr)

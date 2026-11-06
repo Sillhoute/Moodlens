@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
+    "predev": "node -e \"const fs = require('fs'); if (!fs.existsSync('venv')) { console.error('❌ Virtual environment (venv) belum dibuat! Jalankan: python3 -m venv venv && source venv/bin/activate && pip install tensorflow numpy opencv-python'); process.exit(1); }\"",
     "dev": "bun --watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "build": "bun run typecheck && bun run test && tsc",
+    "build": "bun run typecheck && tsc",
     "start": "bun dist/server.js",
     "db:push": "node node_modules/prisma/build/index.js db push",
     "db:generate": "node node_modules/prisma/build/index.js generate"

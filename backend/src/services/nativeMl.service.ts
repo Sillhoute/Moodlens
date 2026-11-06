@@ -3,9 +3,13 @@ import path from "path";
 import fs from "fs";
 import { logger } from "../utils/logger";
 
-// Deteksi otomatis perintah python yang tersedia di server/OS
 function getPythonCommand(): string {
-  return process.platform === "win32" ? "python" : "python3";
+  // Path absolut ke python di dalam folder venv proyek
+  const venvPython = path.join(process.cwd(), "venv", "bin", "python");
+  if (fs.existsSync(venvPython)) {
+    return venvPython;
+  }
+  return "python3"; // Fallback ke sistem jika venv belum ada
 }
 
 export async function runNativePrediction(imageBuffer: Buffer): Promise<any> {
@@ -22,7 +26,7 @@ export async function runNativePrediction(imageBuffer: Buffer): Promise<any> {
       "predict_worker.py",
     );
 
-    logger.ml(`Menjalankan worker Python (${pythonExecutable})...`);
+    logger.ml(`Menjalankan worker Python via venv (${pythonExecutable})...`);
 
     const resultData = await new Promise<string>((resolve, reject) => {
       const pythonProcess = spawn(pythonExecutable, [scriptPath, tempFilePath]);
