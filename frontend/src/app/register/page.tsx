@@ -46,7 +46,7 @@ export default function RegisterPage() {
         showToast.error("Gagal auto-login, silakan masuk manual.");
         router.push("/login");
       } else {
-        router.push("/prediction");
+        router.push("/");
         router.refresh();
       }
     } catch (err) {

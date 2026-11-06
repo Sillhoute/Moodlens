@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "predev": "node -e \"const fs = require('fs'); if (!fs.existsSync('venv')) { console.error('❌ Virtual environment (venv) belum dibuat! Jalankan: python3 -m venv venv && source venv/bin/activate && pip install tensorflow numpy opencv-python'); process.exit(1); }\"",
+    "predev": "node -e \"const { execSync } = require('child_process'); const { existsSync } = require('fs'); if (!existsSync('venv')) { console.log('⚙️ Membuat virtual environment (venv)...'); execSync('python3 -m venv venv', { stdio: 'inherit' }); } console.log('📦 Memeriksa & memasang dependensi Python...'); execSync('venv/bin/pip install --upgrade pip tensorflow numpy opencv-python', { stdio: 'inherit' });\"",
     "dev": "bun --watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
