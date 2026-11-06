@@ -34,7 +34,10 @@ import {
 const LIVE_INTERVAL_MS = 400;
 
 function PredictionContent() {
-  const { data: session } = useSession();
+  // Pakai status login, bukan objek session: objek session dibuat ulang di setiap request,
+  // sehingga loop webcam akan ter-reset dan mengirim request tanpa jeda.
+  const { status } = useSession();
+  const isLoggedIn = status === "authenticated";
   const searchParams = useSearchParams();
 
   const initialMode =
@@ -168,11 +171,11 @@ function PredictionContent() {
       if (!isLooping) setIsAnalyzing(true);
 
       try {
-        const saveHistory = Boolean(session && !isLooping);
+        const saveHistory = Boolean(isLoggedIn && !isLooping);
         const result = await predictImage(fileToUpload, source, saveHistory);
         setPrediction(result);
 
-        if (!session && !isLooping && result.n_faces > 0) {
+        if (!isLoggedIn && !isLooping && result.n_faces > 0) {
           const mainFace = result.faces[0];
           if (mainFace && previewUrl) {
             guestStorage.addHistory({
@@ -201,7 +204,7 @@ function PredictionContent() {
       previewUrl,
       selectedFile,
       selectedModel,
-      session,
+      isLoggedIn,
     ],
   );
 
@@ -680,7 +683,7 @@ function PredictionContent() {
               )}
 
               <div className="pt-2">
-                {session ? (
+                {isLoggedIn ? (
                   <p className="text-[11px] text-success flex items-center gap-1.5 font-medium">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     {isRealtime

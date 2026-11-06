@@ -61,7 +61,11 @@ interface StatsApiResponse {
 }
 
 export default function TrackPage() {
-  const { data: session } = useSession();
+  // Pakai status login, bukan objek session. Objek session dibuat ulang setiap kali
+  // getSession() dipanggil (di setiap request API), sehingga kalau session dijadikan
+  // dependensi, data akan terus dimuat ulang tanpa henti.
+  const { status } = useSession();
+  const isLoggedIn = status === "authenticated";
 
   // State Statistik
   const [statsDays, setStatsDays] = useState<number>(14);
@@ -78,7 +82,7 @@ export default function TrackPage() {
   // Load Statistik
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
-    if (session) {
+    if (isLoggedIn) {
       try {
         const res = (await fetchStats(statsDays)) as StatsApiResponse;
         setStatsData(res);
@@ -146,12 +150,12 @@ export default function TrackPage() {
       });
     }
     setStatsLoading(false);
-  }, [session, statsDays]);
+  }, [isLoggedIn, statsDays]);
 
   // Load Riwayat
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
-    if (session) {
+    if (isLoggedIn) {
       try {
         const res = (await fetchHistory(
           historyOffset,
@@ -181,20 +185,21 @@ export default function TrackPage() {
       setHistoryItems(sliced);
     }
     setHistoryLoading(false);
-  }, [session, historyOffset, historyLimit]);
+  }, [isLoggedIn, historyOffset, historyLimit]);
+
+  // Tunggu status login diketahui dulu, agar data Guest tidak sempat tampil sebelum data akun.
+  useEffect(() => {
+    if (status !== "loading") loadStats();
+  }, [loadStats, status]);
 
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    if (status !== "loading") loadHistory();
+  }, [loadHistory, status]);
 
   // Hapus Satu Riwayat
   const handleDeleteItem = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus riwayat ini?")) return;
-    if (session) {
+    if (isLoggedIn) {
       try {
         await deleteHistoryItem(parseInt(id, 10));
         showToast.success("Riwayat berhasil dihapus");
@@ -221,7 +226,7 @@ export default function TrackPage() {
       )
     )
       return;
-    if (session) {
+    if (isLoggedIn) {
       try {
         await clearAllHistory();
         showToast.success("Semua riwayat berhasil dibersihkan");
