@@ -41,8 +41,8 @@ Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang 
 
 | Model / Arsitektur   | Akurasi Pengujian | Macro F1-Score | Keterangan                                         |
 | -------------------- | ----------------- | -------------- | -------------------------------------------------- |
-| Custom Residual CNN  | 56,0%             | 0,570          | Cepat & ringan untuk ekstraksi fitur spasial dasar |
-| Pre-trained ResNet50 | 61,0%             | 0,597          | Unggul dalam ekstraksi pola visual kompleks (+5%)  |
+| Custom Residual CNN  | 56,0%             | 0,51           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
+| Pre-trained ResNet50 | 61,0%             | 0,59           | Unggul dalam ekstraksi pola visual kompleks (+5%)  |
 
 ---
 
