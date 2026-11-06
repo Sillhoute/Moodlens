@@ -9,7 +9,7 @@ Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung mel
 | Container           | Teknologi Utama                              | Peran & Tanggung Jawab                                                                                                          | Port Akses |
 | ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | `frontend` | Next.js, React, NextAuth | Antarmuka pengguna (UI/UX) dan manajemen autentikasi sesi. Browser memanggil backend langsung di port 9000. | `4000` |
-| `backend` | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah (OpenCV Haar Cascade), inferensi ensemble dua model, riwayat, dan statistik emosi. | `9000` |
+| `backend` | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah (OpenCV YuNet, cadangan Haar Cascade), inferensi model pilihan (Vanilla CNN, ResNet50, atau ensemble keduanya), riwayat, dan statistik emosi. | `9000` |
 | `database` | PostgreSQL 15, Volume Persistent | Menyimpan data akun pengguna (password di-hash bcrypt) dan riwayat prediksi. Hanya bisa diakses backend. | - |
 
 > **Privasi & Keamanan:** Citra wajah mentah yang diproses melalui unggahan foto atau _webcam_ hanya diekstrak di memori volatil (_runtime memory_) dan **tidak pernah disimpan** ke database maupun penyimpanan disk. Database hanya menyimpan metadata hasil prediksi emosi dan statistik terkait.

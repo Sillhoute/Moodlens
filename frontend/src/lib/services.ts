@@ -10,6 +10,7 @@ export async function predictImage(
   imageFile: Blob | File,
   source: "upload" | "webcam",
   saveHistory: boolean = true,
+  model: "vanilla" | "resnet50" | "ensemble" = "resnet50",
 ): Promise<PredictionResult> {
   const formData = new FormData();
   formData.append(
@@ -19,9 +20,11 @@ export async function predictImage(
   );
   formData.append("source", source);
   formData.append("save_history", String(saveHistory));
+  formData.append("model", model);
 
   const response = await api.post<PredictionResult>("/predict", formData, {
     headers: { "Content-Type": "multipart/form-data" },
+    skipAuth: !saveHistory,
   });
   return response.data;
 }

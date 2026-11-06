@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "predev": "node scripts/setup_python.js",
+    "predev": "node scripts/setup-venv.js",
     "dev": "bun --watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
