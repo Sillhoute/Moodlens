@@ -1,9 +1,8 @@
-node_modules/
-dist/
+# File rahasia tidak boleh ikut ter-commit
 .env
-*.log
+.env.*
+!.env.example
+
+node_modules/
 __pycache__/
-*.pyc
 .pytest_cache/
-.venv/
-*.db

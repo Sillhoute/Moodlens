@@ -1,16 +1,50 @@
-# Tahap 1: build aset statis React menggunakan Node.js
-FROM node:22-alpine AS build
+# 1. Base Image menggunakan Node.js Alpine yang stabil
+FROM node:20-alpine AS base
+
+# Install dependencies hanya jika diperlukan
+FROM base AS deps
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+
+# Proyek ini memakai Bun dengan lockfile teks bun.lock, jadi versi library selalu sama
+COPY package.json bun.lock ./
+RUN npm install -g bun@1.3.0 && bun install --frozen-lockfile
+
+# 2. Builder Stage
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Commit SHA dari pipeline CI ditampilkan sebagai "Versi deploy" di halaman.
-ARG APP_VERSION=local
-ENV VITE_APP_VERSION=$APP_VERSION
+
+# Alamat backend yang dipanggil dari BROWSER. Variabel NEXT_PUBLIC_* ditanam ke JavaScript
+# saat build, sehingga harus diberikan di sini (build-arg), bukan saat container dijalankan.
+ARG NEXT_PUBLIC_API_URL=http://localhost:9000/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Jalankan build Next.js menggunakan npm/npx standar Node.js
 RUN npm run build
 
-# Tahap 2: image akhir hanya berisi Nginx dan hasil build, tanpa Node.js
-FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+# 3. Runner Stage (Production image yang ringan)
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=4000
+ENV HOSTNAME="0.0.0.0"
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 4000
+
+# Jalankan server Next.js standalone menggunakan Node
+CMD ["node", "server.js"]

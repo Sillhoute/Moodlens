@@ -1,30 +1,42 @@
-# ---- Backend: FastAPI + TensorFlow (CPU) + OpenCV ----
-FROM python:3.13-slim
+# Gunakan image resmi Python 3.11 slim yang ringan namun stabil untuk TensorFlow & OpenCV
+FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    TF_CPP_MIN_LOG_LEVEL=2 \
-    MODEL_DIR=/app/model_final
+# curl & unzip untuk memasang Bun, openssl dibutuhkan oleh Prisma
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    unzip \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install Bun (JavaScript Runtime) dengan versi yang dikunci
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.0"
+
+# Tambahkan Bun ke PATH sistem
+ENV PATH="/root/.bun/bin:$PATH"
+
+# Tentukan direktori kerja di dalam container
 WORKDIR /app
 
-# 1) Library dulu (lapisan ini di-cache selama requirements.txt tidak berubah)
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# 1) Library Python dulu, karena paling lama dipasang.
+#    Lapisan ini di-cache selama requirements.txt tidak berubah.
+COPY requirements.txt ./
+RUN python3 -m venv venv && \
+    ./venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# 2) Model hasil Notebook 4 (SHA-256 dicek saat backend menyala) lalu kode aplikasi
-COPY model_final/ ./model_final/
-COPY app/ ./app/
+# 2) Dependensi Node.js / Bun, di-cache selama package.json dan bun.lock tidak berubah
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
-# 3) Jalankan sebagai user biasa, bukan root
-RUN useradd --create-home --uid 1000 appuser && chown -R appuser /app
-USER appuser
+# 3) Baru kemudian kode backend
+COPY . .
 
-EXPOSE 8000
-# Model butuh ±10-30 detik untuk dimuat, karena itu start-period dibuat longgar
-HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
-  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health', timeout=4).status == 200 else 1)"
+# Generate Prisma Client lalu build TypeScript ke JavaScript.
+# Kalau build gagal, build image juga harus gagal (jangan disembunyikan).
+RUN bun run db:generate && bun run build
 
-# Satu worker: setiap worker memuat kedua model (±1,5 GB RAM)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Ekspose port backend Express
+EXPOSE 9000
+
+# Saat container menyala: buat/sesuaikan tabel database dari schema.prisma, lalu jalankan server
+CMD ["sh", "-c", "bun run db:push --skip-generate && bun run start"]
