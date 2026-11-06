@@ -1,4 +1,4 @@
-version: "3.8"
+name: moodlens
 
 services:
   # 1. Container PostgreSQL Database
@@ -12,7 +12,7 @@ services:
       - POSTGRES_PORT=5432
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
     ports:
-      - "5434:5432" # Port lokal 5434 memetakan ke port internal 5432 database
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -49,6 +49,9 @@ services:
     environment:
       - PORT=4000
       - NEXT_PUBLIC_API_URL=http://localhost:9000/api
+      - NEXTAUTH_URL=http://localhost:4000
+      - AUTH_URL=http://localhost:4000/api/auth
+      - AUTH_TRUST_HOST=true
     ports:
       - "4000:4000"
     depends_on:
