@@ -3,6 +3,7 @@ dotenv.config();
 
 import { spawnSync } from "child_process";
 import app from "./app";
+import { startNativeMlWorker, stopNativeMlWorker } from "./services/nativeMl.service";
 import { logger } from "./utils/logger";
 import path from "path";
 
@@ -45,21 +46,34 @@ function ensurePythonEnv() {
   logger.success("SERVER", "Lingkungan Python siap digunakan.");
 }
 
-function start() {
+async function start() {
   try {
-    // Jalankan pengecekan sekali di awal sebelum server nyala
     ensurePythonEnv();
+    await startNativeMlWorker();
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       logger.success(
         "SERVER",
         `🚀 Bun server berjalan di http://localhost:${PORT}`,
       );
     });
+
+    const shutdown = () => {
+      server.close(() => {
+        stopNativeMlWorker()
+          .then(() => process.exit(0))
+          .catch((error: unknown) => {
+            logger.error("SERVER", "Gagal menghentikan Python ML worker:", error);
+            process.exit(1);
+          });
+      });
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
   } catch (error) {
     logger.error("SERVER", "Gagal menjalankan server:", error);
     process.exit(1);
   }
 }
 
-start();
+void start();

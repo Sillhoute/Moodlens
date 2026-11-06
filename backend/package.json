@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "predev": "node -e \"const { execSync } = require('child_process'); const { existsSync } = require('fs'); if (!existsSync('venv')) { console.log('⚙️ Membuat virtual environment (venv)...'); execSync('python3 -m venv venv', { stdio: 'inherit' }); } console.log('📦 Memeriksa & memasang dependensi Python...'); execSync(\\\"venv/bin/pip install --upgrade pip tensorflow numpy 'opencv-python<5'\\\", { stdio: 'inherit' });\"",
+    "predev": "node scripts/setup-venv.js",
     "dev": "bun --watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

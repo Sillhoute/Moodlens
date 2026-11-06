@@ -1,11 +1,25 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 import { prisma } from "../config/prisma";
-import { runNativePrediction } from "../services/nativeMl.service";
+import {
+  runNativePrediction,
+  type PredictionModel,
+} from "../services/nativeMl.service";
+
+function isPredictionModel(value: unknown): value is PredictionModel {
+  return value === "vanilla" || value === "resnet50" || value === "ensemble";
+}
 
 export async function predict(req: AuthenticatedRequest, res: Response) {
   if (!req.file) {
     return res.status(400).json({ message: "Berkas foto wajib diunggah" });
+  }
+
+  const requestedModel: unknown = req.body?.model ?? "resnet50";
+  if (!isPredictionModel(requestedModel)) {
+    return res.status(400).json({
+      message: "Model harus vanilla, resnet50, atau ensemble",
+    });
   }
 
   const source = (req.body.source || "upload").toLowerCase();
@@ -15,8 +29,7 @@ export async function predict(req: AuthenticatedRequest, res: Response) {
   const t0 = Date.now();
 
   try {
-    // Panggil fungsi Python langsung di dalam backend Express
-    const hasil = await runNativePrediction(req.file.buffer);
+    const hasil = await runNativePrediction(req.file.buffer, requestedModel);
     const durationMs = Date.now() - t0;
     hasil.duration_ms = durationMs;
     hasil.source = source;
@@ -32,7 +45,7 @@ export async function predict(req: AuthenticatedRequest, res: Response) {
           nFaces: hasil.n_faces,
           durationMs,
           faces: {
-            create: hasil.faces.map((fr: any) => ({
+            create: hasil.faces.map((fr) => ({
               faceIndex: fr.index,
               boxX: fr.box.x,
               boxY: fr.box.y,
@@ -50,10 +63,12 @@ export async function predict(req: AuthenticatedRequest, res: Response) {
     }
 
     return res.json(hasil);
-  } catch (error: any) {
-    console.error("Error menjalankan native model:", error.message);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Kesalahan tidak diketahui";
+    console.error("Error menjalankan native model:", message);
     return res
       .status(500)
-      .json({ message: "Gagal memproses prediksi", error: error.message });
+      .json({ message: "Gagal memproses prediksi", error: message });
   }
 }
