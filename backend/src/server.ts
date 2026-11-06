@@ -5,14 +5,10 @@ import { spawnSync } from "child_process";
 import app from "./app";
 import { logger } from "./utils/logger";
 import path from "path";
+import { getPythonCommand, startMlWorker } from "./services/nativeMl.service";
 
 const PORT = parseInt(process.env.PORT || "8000", 10);
-const pythonCmd = path.join(
-  process.cwd(),
-  "venv",
-  process.platform === "win32" ? "Scripts" : "bin",
-  process.platform === "win32" ? "python.exe" : "python",
-);
+const pythonCmd = getPythonCommand();
 
 function ensurePythonEnv() {
   logger.info("SERVER", "Memeriksa lingkungan Python & pustaka ML...");
@@ -49,6 +45,11 @@ function start() {
   try {
     // Jalankan pengecekan sekali di awal sebelum server nyala
     ensurePythonEnv();
+
+    // Model dimuat di latar belakang. Selama belum siap, /api/health menjawab 503.
+    startMlWorker().catch((error) =>
+      logger.error("SERVER", "Worker Python gagal dinyalakan:", error),
+    );
 
     app.listen(PORT, () => {
       logger.success(

@@ -1,15 +1,20 @@
 import sys
 import json
+import os
+
+# Harus diatur sebelum TensorFlow di-import agar log TensorFlow tidak mengotori output.
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import cv2
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, Model
 from tensorflow.keras.applications import ResNet50
-import os
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-EMOTION_CLASSES = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
+# Urutan WAJIB sama dengan urutan kelas saat training. flow_from_directory di notebook
+# mengurutkan folder secara alfabetis: angry, disgust, fear, happy, neutral, sad, surprise.
+# Kalau urutannya beda, indeks hasil model akan diberi nama ekspresi yang salah.
+EMOTION_CLASSES = ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"]
 IMG_HEIGHT, IMG_WIDTH = 48, 48
 NEW_IMG_SIZE = 96
 
@@ -112,21 +117,29 @@ def process_image(image_path):
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     faces_coords = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-    faces_result = []
+    # Kalau tidak ada wajah, jangan menebak ekspresi dari seluruh gambar.
     if len(faces_coords) == 0:
-        faces_coords = [[0, 0, w, h]]
+        return {
+            "image_width": w,
+            "image_height": h,
+            "n_faces": 0,
+            "faces": [],
+            "message": "Tidak ada wajah terdeteksi. Pastikan wajah menghadap kamera dan cukup terang."
+        }
 
+    faces_result = []
     for idx, (x, y, fw, fh) in enumerate(faces_coords):
         face_roi = gray[y:y+fh, x:x+fw]
         face_resized = cv2.resize(face_roi, (IMG_HEIGHT, IMG_WIDTH))
-        
+
         tensor_input = face_resized.astype("float32") / 255.0
         tensor_input = np.expand_dims(tensor_input, axis=-1)
         tensor_input = np.expand_dims(tensor_input, axis=0)
 
-        pred_v = vanilla_model.predict(tensor_input, verbose=0)
-        pred_r = resnet_model.predict(tensor_input, verbose=0)
-        
+        # Memanggil model secara langsung jauh lebih cepat daripada model.predict() untuk satu gambar.
+        pred_v = vanilla_model(tensor_input, training=False).numpy()
+        pred_r = resnet_model(tensor_input, training=False).numpy()
+
         ensemble_probs = (pred_v + pred_r) / 2.0
         probs_list = ensemble_probs[0].tolist()
         
@@ -153,11 +166,34 @@ def process_image(image_path):
         "message": f"{len(faces_result)} wajah terdeteksi."
     }
 
+def serve():
+    """Mode server: worker tetap hidup dan model cukup dimuat sekali.
+
+    Backend mengirim satu path gambar per baris lewat stdin, lalu worker membalas
+    satu baris JSON lewat stdout. Tanpa mode ini, setiap request harus menyalakan
+    Python dan memuat ulang TensorFlow, sehingga satu prediksi bisa 30-40 detik.
+    """
+    print(json.dumps({"ready": True}), flush=True)
+    for line in sys.stdin:
+        img_path = line.strip()
+        if not img_path:
+            continue
+        try:
+            result = process_image(img_path)
+        except Exception as error:  # satu gambar rusak tidak boleh mematikan worker
+            result = {"error": str(error)}
+        print(json.dumps(result), flush=True)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) >= 2 and sys.argv[1] == "--serve":
+        serve()
+        sys.exit(0)
+
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Path gambar tidak disertakan"}))
         sys.exit(1)
-    
+
     img_path = sys.argv[1]
     result = process_image(img_path)
     print(json.dumps(result))

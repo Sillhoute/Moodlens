@@ -8,9 +8,9 @@ Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung mel
 
 | Container           | Teknologi Utama                              | Peran & Tanggung Jawab                                                                                                          | Port Akses |
 | ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `moodlens-frontend` | Next.js, React, Nginx                        | Antarmuka pengguna (UI/UX), manajemen autentikasi sesi, dan reverse proxy untuk routing `/api`.                                 | `4000`     |
-| `moodlens-backend`  | Python, Express.js / Bun, TensorFlow, OpenCV | Layanan inti untuk autentikasi user, deteksi wajah (BlazeFace/OpenCV), inferensi model, manajemen riwayat, dan statistik emosi. | `9000`     |
-| `moodlens-db`       | PostgreSQL 15, Volume Persistent             | Menyimpan data akun pengguna (terenkripsi bcrypt) dan rekam jejak riwayat prediksi emosi.                                       | `5432`     |
+| `frontend` | Next.js, React, NextAuth | Antarmuka pengguna (UI/UX) dan manajemen autentikasi sesi. Browser memanggil backend langsung di port 9000. | `4000` |
+| `backend` | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah (OpenCV Haar Cascade), inferensi ensemble dua model, riwayat, dan statistik emosi. | `9000` |
+| `database` | PostgreSQL 15, Volume Persistent | Menyimpan data akun pengguna (password di-hash bcrypt) dan riwayat prediksi. Hanya bisa diakses backend. | - |
 
 > **Privasi & Keamanan:** Citra wajah mentah yang diproses melalui unggahan foto atau _webcam_ hanya diekstrak di memori volatil (_runtime memory_) dan **tidak pernah disimpan** ke database maupun penyimpanan disk. Database hanya menyimpan metadata hasil prediksi emosi dan statistik terkait.
 
@@ -35,7 +35,7 @@ Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang 
 
 ### Penggunaan Ambang Batas Keyakinan ($\tau$)
 
-- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru. Backend juga memvalidasi integritas file model menggunakan verifikasi SHA-256 saat pertama kali dinyalakan.
+- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru.
 
 ### Metrik Performa Evaluasi Model
 
@@ -83,11 +83,51 @@ Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan apl
 
 ### Langkah Instalasi & Eksekusi:
 
+#### A. Dengan Docker Compose (3 container)
+
 1. **Konfigurasi Lingkungan (.env):**
-   Simpan file konfigurasi lingkungan Anda di masing-masing folder (`backend/.env` dan `frontend/.env`). Pastikan parameter seperti `POSTGRES_PASSWORD` dan `JWT_SECRET` telah disesuaikan. Jangan pernah memindahkan atau meng-commit file rahasia ke repositori publik.
+   Salin `.env.example` di folder utama menjadi `.env`, lalu ganti `POSTGRES_PASSWORD`, `JWT_SECRET`, dan `AUTH_SECRET`. File `.env` tidak ikut ter-commit.
+
+   ```bash
+   cp .env.example .env
+   ```
 
 2. **Menjalankan Container via Docker Compose:**
    Buka terminal di direktori root proyek, lalu jalankan perintah berikut:
    ```bash
    docker compose up -d --build --wait
    ```
+   Frontend terbuka di <http://localhost:4000> dan backend di <http://localhost:9000/api/health>. Database tidak dibuka ke luar,
+   dan tabelnya dibuat otomatis oleh backend saat container menyala (`prisma db push`).
+
+#### B. Tanpa Docker (mode development)
+
+1. Jalankan database: `docker run --name fer-postgres -e POSTGRES_USER=fer -e POSTGRES_PASSWORD=rahasia -e POSTGRES_DB=fer_db -p 5434:5432 -d postgres:15-alpine`
+2. Backend: salin `backend/.env.example` menjadi `backend/.env`, lalu di folder `backend` jalankan `bun install`, `bun run db:generate`,
+   `bun run db:push`, dan `bun run dev` (port 8000). `bun run dev` otomatis membuat `venv` dan memasang `requirements.txt`.
+3. Frontend: salin `frontend/.env.example` menjadi `frontend/.env`, lalu di folder `frontend` jalankan `bun install` dan `bun run dev` (port 3000).
+
+### Menjalankan test
+
+```bash
+cd backend && bun run test
+```
+
+```bash
+cd backend && pip install -r requirements-dev.txt && python -m pytest -q tests
+```
+
+Test Python memuat model asli dan memastikan urutan label ekspresi sama dengan saat training.
+
+## Alur CI/CD
+
+Workflow ada di `.github/workflows/ci-cd.yml` dan berjalan setiap ada push ke `main`:
+
+1. **Test:** `test-backend` (typecheck dan vitest), `test-ml` (pytest dengan model asli), dan `test-frontend` (build Next.js).
+2. **Build dan push:** image backend dan frontend di-build di VM GitHub lalu dikirim ke Docker Hub sebagai
+   `<username>/moodlens-backend` dan `<username>/moodlens-frontend`, dengan tag commit SHA dan `latest`.
+3. **Deploy:** self-hosted runner di laptop kelompok menarik image terbaru dari Docker Hub, menjalankan `docker compose up`,
+   lalu smoke test ke `/api/health` dan halaman frontend.
+
+Syarat di GitHub (**Settings > Secrets and variables > Actions**): variable `DOCKERHUB_USERNAME`, serta secret `DOCKERHUB_TOKEN`,
+`POSTGRES_PASSWORD`, dan `JWT_SECRET` (`AUTH_SECRET` opsional). Runner dijalankan dengan `run.cmd` di laptop yang menjadi server.

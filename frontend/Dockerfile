@@ -5,19 +5,20 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 
-# Salin file package manager (mendukung npm/pnpm/yarn/bun)
-COPY package.json package-lock.json* bun.lockb* ./
-RUN \
-  if [ -f bun.lockb ]; then npm install -g bun && bun install --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  else npm install; \
-  fi
+# Proyek ini memakai Bun dengan lockfile teks bun.lock, jadi versi library selalu sama
+COPY package.json bun.lock ./
+RUN npm install -g bun@1.3.0 && bun install --frozen-lockfile
 
 # 2. Builder Stage
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Alamat backend yang dipanggil dari BROWSER. Variabel NEXT_PUBLIC_* ditanam ke JavaScript
+# saat build, sehingga harus diberikan di sini (build-arg), bukan saat container dijalankan.
+ARG NEXT_PUBLIC_API_URL=http://localhost:9000/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
