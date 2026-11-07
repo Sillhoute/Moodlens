@@ -81,16 +81,32 @@ Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan apl
 - Docker Desktop aktif dengan alokasi memori minimal 4 GB dan ruang disk kosong $\approx 5$ GB.
 - Bun / Node.js dan Python 3.10+ (jika ingin menjalankan pengujian secara lokal).
 
+### File env: mana dipakai untuk apa
+
+Env untuk Docker dan env untuk development lokal dipisah. Ketiganya tidak saling membaca:
+
+| File (salin dari `.env.example` di folder yang sama) | Dipakai oleh | Port |
+| --- | --- | --- |
+| `.env` di folder utama | `docker compose` (3 container) | frontend 4000, backend 9000 |
+| `backend/.env` | `bun run dev` di folder `backend` | 8000 |
+| `frontend/.env` | `bun run dev` di folder `frontend` | 3000 |
+| GitHub Secrets | job `deploy` di pipeline CI/CD | 4000, 9000 |
+
+Semua file `.env` diabaikan Git, jadi password dan secret tidak pernah masuk repository.
+
 ### Langkah Instalasi & Eksekusi:
 
 #### A. Dengan Docker Compose (3 container)
 
 1. **Konfigurasi Lingkungan (.env):**
-   Salin `.env.example` di folder utama menjadi `.env`, lalu ganti `POSTGRES_PASSWORD`, `JWT_SECRET`, dan `AUTH_SECRET`. File `.env` tidak ikut ter-commit.
+   Salin `.env.example` di folder utama menjadi `.env`, lalu ganti `POSTGRES_PASSWORD`, `JWT_SECRET`, dan `AUTH_SECRET`.
 
    ```bash
-   cp .env.example .env
+   copy .env.example .env
    ```
+
+   Ingin memakai image hasil pipeline dari Docker Hub tanpa build sendiri? Hapus tanda `#` di depan
+   `IMAGE_PREFIX` dan `IMAGE_TAG` pada `.env`, lalu jalankan `docker compose up -d --pull always --no-build --wait`.
 
 2. **Menjalankan Container via Docker Compose:**
    Buka terminal di direktori root proyek, lalu jalankan perintah berikut:
