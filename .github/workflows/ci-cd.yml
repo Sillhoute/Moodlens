@@ -19,7 +19,7 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: fer
-          POSTGRES_PASSWORD: rahasia
+          POSTGRES_PASSWORD: rahasia_test
           POSTGRES_DB: fer_db
         ports:
           - 5432:5432
@@ -29,8 +29,8 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
-      DATABASE_URL: postgresql://fer:rahasia@localhost:5432/fer_db?schema=public
-      JWT_SECRET: "super-secret-key-ganti-di-produksi-minimal-32-karakter"
+      DATABASE_URL: postgresql://fer:rahasia_test@localhost:5432/fer_db?schema=public
+      JWT_SECRET: "test-secret-key-for-ci-pipeline-only"
     defaults:
       run:
         working-directory: backend
@@ -42,7 +42,6 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
-      # Tambahkan step test backend Anda di sini jika ada (misal pytest)
 
   test-frontend:
     runs-on: ubuntu-latest
@@ -73,11 +72,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+
+      # Perhatikan indentasi 'with:' di bawah ini agar tidak error 'Invalid action input'
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - id: meta
         uses: docker/metadata-action@v5
         with:
@@ -85,6 +87,7 @@ jobs:
           tags: |
             type=raw,value=${{ github.sha }}
             type=raw,value=latest
+
       - uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.service }}
@@ -94,12 +97,36 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # ---------- Deploy Otomatis ----------
+  # ---------- Generate Env & Deploy ----------
   deploy:
     needs: build-and-push
-    runs-on: ubuntu-latest # Atau runner lokal Anda jika menggunakan self-hosted
+    runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Backend .env.deploy securely
+        run: |
+          mkdir -p backend
+          echo "PORT=9000" >> backend/.env.deploy
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> backend/.env.deploy
+          echo "JWT_EXPIRE_MINUTES=480" >> backend/.env.deploy
+          echo "POSTGRES_HOST=database" >> backend/.env.deploy
+          echo "POSTGRES_PORT=5432" >> backend/.env.deploy
+          echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> backend/.env.deploy
+          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> backend/.env.deploy
+          echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> backend/.env.deploy
+          echo 'DATABASE_URL="postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@database:5432/${{ secrets.POSTGRES_DB }}?schema=public"' >> backend/.env.deploy
+
+      - name: Generate Frontend .env.deploy securely
+        run: |
+          mkdir -p frontend
+          echo 'NEXT_PUBLIC_API_URL="http://localhost:9000/api"' >> frontend/.env.deploy
+          echo 'NEXTAUTH_URL="http://localhost:4000"' >> frontend/.env.deploy
+          echo 'AUTH_URL="http://localhost:4000/api/auth"' >> frontend/.env.deploy
+          echo "AUTH_TRUST_HOST=true" >> frontend/.env.deploy
+          echo "AUTH_SECRET=${{ secrets.AUTH_SECRET }}" >> frontend/.env.deploy
+          echo "NEXTAUTH_SECRET=${{ secrets.AUTH_SECRET }}" >> frontend/.env.deploy
+
       - name: Info Deployment Berhasil
         run: |
-          echo "Image berhasil di-push ke GitHub Container Registry (GHCR)!"
-          echo "Tag commit: ${{ github.sha }}"
+          echo "Konfigurasi deploy berhasil di-generate dari GitHub Secrets!"
