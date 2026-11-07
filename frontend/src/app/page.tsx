@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,6 +7,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { guestStorage, HistoryRecord } from "@/lib/guestStorage";
 import { fetchStats, fetchHistory } from "@/lib/services";
+import { showToast } from "@/lib/toast";
 import {
   ScanFace,
   Upload,
@@ -16,80 +19,61 @@ import {
   Lock,
   Clock,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 
 export default function OverviewPage() {
-  // Pakai status login, bukan objek session, agar data tidak dimuat ulang terus-menerus.
-  const { status } = useSession();
-  const isLoggedIn = status === "authenticated";
+  const { data: session } = useSession();
   const [historyItems, setHistoryItems] = useState<HistoryRecord[]>([]);
   const [totalDetections, setTotalDetections] = useState<number>(0);
   const [topEmotion, setTopEmotion] = useState<string>("-");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (status === "loading") return;
-
-    async function loadOverviewData() {
-      setLoading(true);
-      if (isLoggedIn) {
-        // Mode Auth: Ambil statistik & riwayat asli dari Backend Express via Prisma
-        try {
-          const [historyRes, statsRes] = await Promise.all([
-            fetchHistory(0, 5),
-            fetchStats(14),
-          ]);
-          // fetchHistory/fetchStats sudah mengembalikan isi respons (response.data),
-          // jadi datanya ada di historyRes.items dan statsRes.total_prediksi.
-          setHistoryItems(
-            (historyRes.items || []).map(
-              (p: {
-                id: number;
-                source: string;
-                created_at: string;
-                faces?: Array<{ top_label: string; confidence: number }>;
-              }) => ({
-                id: String(p.id),
-                imagePreview: "",
-                predictedEmotion: p.faces?.[0]?.top_label || "neutral",
-                confidence: p.faces?.[0]?.confidence || 0,
-                modelUsed:
-                  p.source === "webcam" ? "Webcam Stream" : "Image Upload",
-                createdAt: p.created_at,
-              }),
-            ),
-          );
-          setTotalDetections(statsRes.total_prediksi || 0);
-          setTopEmotion(statsRes.ekspresi_terbanyak || "-");
-        } catch {
-          setHistoryItems([]);
-        }
-      } else {
-        // Mode Guest: Hitung statistik dari sessionStorage
-        const localHistory = guestStorage.getHistory();
-        setHistoryItems(localHistory.slice(0, 5));
-        setTotalDetections(localHistory.length);
-
-        if (localHistory.length > 0) {
-          // Cari emosi terbanyak di local session
-          const counts: Record<string, number> = {};
-          localHistory.forEach((item) => {
-            counts[item.predictedEmotion] =
-              (counts[item.predictedEmotion] || 0) + 1;
-          });
-          const sortedEmotions = Object.entries(counts).sort(
-            (a, b) => b[1] - a[1],
-          );
-          setTopEmotion(sortedEmotions[0][0]);
-        } else {
-          setTopEmotion("-");
-        }
+  const loadOverviewData = async () => {
+    setLoading(true);
+    if (session) {
+      try {
+        const [historyRes, statsRes] = await Promise.all([
+          fetchHistory(0, 5),
+          fetchStats(14),
+        ]);
+        setHistoryItems(historyRes.data || []);
+        setTotalDetections(statsRes.data?.total_prediksi || 0);
+        setTopEmotion(statsRes.data?.emosi_dominan || "-");
+      } catch {
+        setHistoryItems([]);
       }
-      setLoading(false);
-    }
+    } else {
+      const localHistory = guestStorage.getHistory();
+      setHistoryItems(localHistory.slice(0, 5));
+      setTotalDetections(localHistory.length);
 
+      if (localHistory.length > 0) {
+        const counts: Record<string, number> = {};
+        localHistory.forEach((item) => {
+          counts[item.predictedEmotion] =
+            (counts[item.predictedEmotion] || 0) + 1;
+        });
+        const sortedEmotions = Object.entries(counts).sort(
+          (a, b) => b[1] - a[1],
+        );
+        setTopEmotion(sortedEmotions[0][0]);
+      } else {
+        setTopEmotion("-");
+      }
+    }
+    setLoading(false);
+  };
+
+  // HANYA dipanggil sekali saat mount
+  useEffect(() => {
     loadOverviewData();
-  }, [isLoggedIn, status]);
+  }, []);
+
+  const handleRefresh = () => {
+    loadOverviewData();
+    showToast.success("Ringkasan diperbarui");
+  };
 
   return (
     <div className="space-y-8">
@@ -97,9 +81,18 @@ export default function OverviewPage() {
       <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card p-8 md:p-10 shadow-2xl">
         <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
         <div className="relative z-10 space-y-4 max-w-2xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
-            <ScanFace className="h-3.5 w-3.5" />
-            <span>FER-2013 Deep Learning Ensemble</span>
+          <div className="flex items-center justify-between">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
+              <ScanFace className="h-3.5 w-3.5" />
+              <span>FER-2013 Deep Learning Ensemble</span>
+            </div>
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted shadow-sm transition-all"
+            >
+              <RefreshCw className="h-3.5 w-3.5 text-primary" />
+              <span>Refresh</span>
+            </button>
           </div>
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight">
             Pengenalan Ekspresi Wajah{" "}
@@ -111,7 +104,6 @@ export default function OverviewPage() {
             atau simpan analisis riwayat Anda.
           </p>
 
-          {/* Shortcut Cepat ke Prediction */}
           <div className="pt-2 flex flex-wrap gap-3">
             <Link
               href="/prediction?mode=upload"
@@ -132,7 +124,7 @@ export default function OverviewPage() {
       </div>
 
       {/* Banner Imbauan Guest */}
-      {status === "unauthenticated" && (
+      {!session && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-warning/30 bg-warning/10 p-5 text-xs text-warning-foreground shadow-sm">
           <div className="flex items-start sm:items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5 sm:mt-0" />
@@ -192,7 +184,7 @@ export default function OverviewPage() {
               Status Penyimpanan
             </span>
             <div className="text-sm font-bold text-foreground">
-              {isLoggedIn ? (
+              {session ? (
                 <span className="text-success flex items-center gap-1">
                   ● Database Tersambung
                 </span>

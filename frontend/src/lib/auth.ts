@@ -42,13 +42,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          // Kode ini berjalan di server Next.js, bukan di browser. Di Docker, "localhost" berarti
-          // container frontend itu sendiri, jadi backend dipanggil lewat INTERNAL_API_URL
-          // (contoh: http://backend:9000/api). Tanpa Docker, cukup memakai NEXT_PUBLIC_API_URL.
-          const apiUrl =
-            process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
           const { data } = await axios.post<LoginBackendResponse>(
-            `${apiUrl}/auth/login`,
+            `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
             {
               username: credentials.username,
               password: credentials.password,

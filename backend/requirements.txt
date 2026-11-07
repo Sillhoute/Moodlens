@@ -1,6 +1,0 @@
-# Library Python untuk predict_worker.py. Versi dikunci agar hasil build selalu sama.
-tensorflow==2.21.0
-numpy<2.2
-# opencv-python-headless tidak butuh library grafis (libGL), cocok untuk server/container.
-# Versi 5 memindahkan CascadeClassifier, jadi dibatasi di bawah 5.
-opencv-python-headless>=4.10,<5

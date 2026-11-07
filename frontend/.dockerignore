@@ -19,8 +19,6 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 *.tsbuildinfo
-
-# File .env lokal tidak boleh ikut masuk ke image (berisi secret dan alamat untuk development)
 .env
 .env.*
 !.env.example

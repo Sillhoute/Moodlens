@@ -15,10 +15,9 @@ const pythonExe = isWin
   ? path.join("venv", "Scripts", "python.exe")
   : path.join("venv", "bin", "python");
 
-// Gunakan 'python -m pip' agar lebih aman dan kompatibel.
-// Versi library diambil dari requirements.txt, sama dengan yang dipakai Docker dan CI.
-execSync(`"${pythonExe}" -m pip install --upgrade pip`, { stdio: "inherit" });
-execSync(`"${pythonExe}" -m pip install -r requirements.txt`, {
-  stdio: "inherit",
-});
+// Gunakan 'python -m pip' agar lebih aman dan kompatibel
+execSync(
+  `"${pythonExe}" -m pip install --upgrade pip tensorflow numpy "opencv-python<5"`,
+  { stdio: "inherit" },
+);
 console.log("✨ Lingkungan Python siap!");
