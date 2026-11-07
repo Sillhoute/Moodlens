@@ -1,7 +1,8 @@
 name: moodlens
 
-# Semua nilai rahasia dibaca dari file .env di folder yang sama dengan file ini
-# (salin dari .env.example). Saat deploy lewat CI/CD, nilainya diisi dari GitHub Secrets.
+# Semua variabel dibaca dari file .env di folder yang sama dengan file ini (salin dari .env.example).
+# backend/.env dan frontend/.env TIDAK dibaca di sini; keduanya khusus `bun run dev`.
+# Saat deploy lewat CI/CD, nilai rahasia diisi dari GitHub Secrets.
 
 services:
   # 1. Container PostgreSQL Database
@@ -36,6 +37,7 @@ services:
       # agar password yang berisi karakter seperti @ atau : tetap bisa dipakai.
       DATABASE_URL: postgresql://${POSTGRES_USER:-fer}:${POSTGRES_PASSWORD_URL:-${POSTGRES_PASSWORD}}@database:5432/${POSTGRES_DB:-fer_db}?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET wajib diisi di .env}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-480}
       APP_VERSION: ${IMAGE_TAG:-local}
     ports:
       - "9000:9000"
