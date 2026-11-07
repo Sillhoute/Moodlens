@@ -23,6 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 # Jalankan build Next.js menggunakan npm/npx standar Node.js
+COPY .env.deploy .env.production
 RUN npm run build
 
 # 3. Runner Stage (Production image yang ringan)

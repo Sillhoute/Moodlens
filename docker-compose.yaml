@@ -7,7 +7,7 @@ services:
     container_name: moodlens-db
     restart: always
     env_file:
-      - ./backend/.env
+      - ./backend/.env.deploy
     ports:
       - "5432:5432"
     volumes:
@@ -23,7 +23,7 @@ services:
     container_name: moodlens-backend
     restart: always
     env_file:
-      - ./backend/.env
+      - ./backend/.env.deploy
     ports:
       - "9000:9000"
     depends_on:
@@ -39,7 +39,7 @@ services:
     container_name: moodlens-frontend
     restart: always
     env_file:
-      - ./frontend/.env
+      - ./frontend/.env.deploy
     ports:
       - "4000:4000"
     depends_on:
