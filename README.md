@@ -28,7 +28,7 @@ Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung mel
 
 ## Arsitektur & Cara Kerja Model Deep Learning
 
-Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang dilatih menggunakan dataset **FER-2013**:
+Sistem ini menggunakan dua model Deep Learning yang dilatih dengan dataset **FER-2013** (28.709 citra latih, 7.178 citra uji), ditambah gabungan keduanya:
 
 1. **Custom Residual CNN (Vanilla):** Arsitektur konvolusi buatan sendiri dengan _skip connections_ (residual block) yang efisien untuk mengekstraksi fitur pola spasial dasar pada citra grayscale $48 \times 48$ piksel.
 2. **Pre-trained ResNet50 (Transfer Learning):** Menggunakan bobot pra-latih _ImageNet_ yang di-fine-tune untuk menangkap struktur anatomi wajah yang lebih kompleks dan mendalam.
@@ -48,7 +48,7 @@ Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang 
 
 ## Analisis Karakteristik Per Kelas Emosi
 
-Berdasarkan hasil pengujian pada 7.178 gambar uji (mengacu pada _Classification Report_ dan _Confusion Matrix_), berikut adalah karakteristik dan performa pengenalan untuk masing-masing dari 7 kelas emosi:
+Berdasarkan hasil pengujian pada 7.178 gambar uji (_Classification Report_ dan _Confusion Matrix_), berikut karakteristik dan performa pengenalan untuk masing-masing dari 7 kelas emosi:
 
 1. **Happy (Senang):**
    - **Performa:** Merupakan kelas dengan akurasi dan stabilitas tertinggi (Precision ~85-87%, Recall ~77-78%).
@@ -83,40 +83,89 @@ Proyek ini membedakan file environment agar Anda tidak keliru antara pengembanga
 
 ---
 
-## Panduan Menjalankan Secara Lokal & Deploy
+## Panduan Menjalankan Secara Lokal
 
 Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan aplikasi:
 
-- Docker Desktop aktif dengan alokasi memori minimal 4 GB.
+- Docker Desktop aktif dengan alokasi memori minimal 4 GB dan ruang disk kosong sekitar 6 GB.
+- Bun / Node.js dan Python 3.11 (jika ingin menjalankan pengujian secara lokal).
 
-### A. Cara Cepat Deploy dengan Docker
+### File env: mana dipakai untuk apa
 
-Jika ingin langsung menjalankan aplikasi di server menggunakan Docker Compose, Anda cukup memakai file `.env.deploy` yang sudah tersedia:
+Env untuk Docker dan env untuk development lokal dipisah. Ketiganya tidak saling membaca:
 
-```bash
-docker compose up -d --build --wait
-```
+| File (salin dari `.env.example` di folder yang sama) | Dipakai oleh                       | Port                        |
+| ---------------------------------------------------- | ---------------------------------- | --------------------------- |
+| `.env` di folder utama                               | `docker compose` (3 container)     | frontend 4000, backend 9000 |
+| `backend/.env`                                       | `bun run dev` di folder `backend`  | 8000                        |
+| `frontend/.env`                                      | `bun run dev` di folder `frontend` | 3000                        |
+| GitHub Secrets                                       | job `deploy` di pipeline CI/CD     | 4000, 9000                  |
 
-Aplikasi langsung aktif secara otomatis:
+Semua file `.env` diabaikan Git, jadi password dan secret tidak pernah masuk repository.
 
-- **Frontend:** `http://localhost:4000`
-- **Backend API Health:** `http://localhost:9000/api/health`
+### A. Dengan Docker Compose (3 container)
 
-### B. Tanpa Docker (Mode Development Lokal)
+1. Salin `.env.example` di folder utama menjadi `.env`, lalu ganti `POSTGRES_PASSWORD`, `JWT_SECRET`, dan `AUTH_SECRET`.
+
+   ```bash
+   copy .env.example .env
+   ```
+
+2. Jalankan salah satu:
+   - **Pakai image hasil pipeline dari Docker Hub (tanpa build):** hapus tanda `#` di depan `IMAGE_PREFIX` dan `IMAGE_TAG` pada `.env`, lalu
+     ```bash
+     docker compose up -d --pull always --no-build --wait
+     ```
+   - **Build sendiri dari source code** (sekitar 15 menit pertama kali):
+     ```bash
+     docker compose up -d --build --wait
+     ```
+
+3. Frontend terbuka di <http://localhost:4000> dan backend di <http://localhost:9000/api/health>. Database tidak dibuka ke luar,
+   dan tabelnya dibuat otomatis oleh backend saat container menyala (`prisma db push`).
+
+### B. Tanpa Docker (mode development)
 
 1. Jalankan database:
    ```bash
    docker run --name fer-postgres -e POSTGRES_USER=fer -e POSTGRES_PASSWORD=rahasia -e POSTGRES_DB=fer_db -p 5434:5432 -d postgres:15-alpine
    ```
-2. Backend: Masuk ke folder `backend`, salin file `.env` (menggunakan konfigurasi lokal), lalu jalankan `bun install`, `bun run db:push`, dan `bun run dev` (port 8000).
-3. Frontend: Masuk ke folder `frontend`, salin file `.env` lokal, lalu jalankan `bun install` dan `bun run dev` (port 3000).
+2. Backend: salin `backend/.env.example` menjadi `backend/.env`, lalu di folder `backend` jalankan `bun install`, `bun run db:generate`,
+   `bun run db:push`, dan `bun run dev` (port 8000). `bun run dev` otomatis membuat `venv` dan memasang `requirements.txt`.
+3. Frontend: salin `frontend/.env.example` menjadi `frontend/.env`, lalu di folder `frontend` jalankan `bun install` dan `bun run dev` (port 3000).
+
+### Menjalankan test
+
+```bash
+cd backend && bun run test
+```
+
+```bash
+cd backend && pip install -r requirements-dev.txt && python -m pytest -q tests
+```
+
+Test Python memuat bobot model asli dan memastikan urutan label, deteksi wajah, serta ketiga pilihan model berjalan benar.
 
 ---
 
 ## Alur CI/CD
 
-Workflow ada di `.github/workflows/ci-cd.yml` dan berjalan otomatis setiap ada push ke branch `main`:
+Workflow ada di `.github/workflows/ci-cd.yml` dan berjalan setiap ada push ke `main` (atau lewat tombol **Run workflow**):
 
-1. **Test:** Menjalankan pengecekan test backend dan frontend.
-2. **Build & Push:** Membuat image Docker dan mengirimkannya ke GitHub Container Registry (GHCR).
-3. **Deploy:** Melakukan pembaruan otomatis pada server target.
+1. **Test:** `test-backend` (typecheck dan vitest), `test-ml` (pytest dengan bobot model asli), dan `test-frontend` (build Next.js).
+2. **Build dan push:** image backend dan frontend di-build di VM GitHub lalu dikirim ke Docker Hub sebagai
+   `<username>/moodlens-backend` dan `<username>/moodlens-frontend`, dengan tag commit SHA dan `latest`.
+3. **Deploy:** self-hosted runner di laptop kelompok menarik image terbaru dari Docker Hub, menjalankan `docker compose up`,
+   lalu smoke test ke `/api/health` dan halaman frontend.
+
+Syarat di GitHub (**Settings > Secrets and variables > Actions**): variable `DOCKERHUB_USERNAME`, serta secret `DOCKERHUB_TOKEN`,
+`POSTGRES_PASSWORD`, dan `JWT_SECRET` (`AUTH_SECRET` opsional). Runner dijalankan dengan `run.cmd` di laptop yang menjadi server.
+
+---
+
+## Notebook
+
+- `notebook/UTS_Modip.ipynb`: eksplorasi data, training, dan evaluasi kedua model. Menghasilkan bobot `.weights.h5` yang dipakai aplikasi.
+- `notebook/Pembahasan_Modip.ipynb`: pembuktian ensemble, ambang keyakinan $\tau = 0,5$, dan eksperimen _selective fine-tuning_ ResNet50.
+
+Bobot di `backend/src/services/model/` adalah hasil notebook tersebut, dengan state optimizer dibuang agar ukurannya di bawah batas 100 MB GitHub.

@@ -1,0 +1,8 @@
+# File rahasia tidak boleh ikut ter-commit
+.env
+.env.*
+!.env.example
+
+node_modules/
+__pycache__/
+.pytest_cache/

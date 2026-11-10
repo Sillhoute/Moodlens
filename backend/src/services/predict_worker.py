@@ -23,6 +23,7 @@ MAX_FACES = 10
 YUNET_SCORE_THRESHOLD = 0.7
 YUNET_NMS_THRESHOLD = 0.3
 MODEL_SPECS = {
+    # Bobot hasil notebook/UTS_Modip.ipynb (tanpa state optimizer agar di bawah 100 MB)
     "vanilla": "best_vanilla_fer_model.weights.h5",
     "resnet50": "best_resnet_fer.weights.h5",
 }
@@ -334,6 +335,8 @@ def main():
         try:
             request = json.loads(line)
             model_name = request.get("model", "resnet50")
+            if model_name not in MODEL_SPECS and model_name != "ensemble":
+                raise ValueError("Model harus vanilla, resnet50, atau ensemble")
             if model_name not in MODEL_SPECS and model_name != "ensemble":
                 raise ValueError("Model harus vanilla, resnet50, atau ensemble")
             result = process_image(request["image"], model_name, models, face_detectors)

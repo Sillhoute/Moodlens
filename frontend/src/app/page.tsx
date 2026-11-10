@@ -23,7 +23,9 @@ import {
 } from "lucide-react";
 
 export default function OverviewPage() {
-  const { data: session } = useSession();
+  // Pakai status login (string), bukan objek session: objek session dibuat ulang di setiap request.
+  const { status } = useSession();
+  const isLoggedIn = status === "authenticated";
   const [historyItems, setHistoryItems] = useState<HistoryRecord[]>([]);
   const [totalDetections, setTotalDetections] = useState<number>(0);
   const [topEmotion, setTopEmotion] = useState<string>("-");
@@ -31,15 +33,34 @@ export default function OverviewPage() {
 
   const loadOverviewData = async () => {
     setLoading(true);
-    if (session) {
+    if (isLoggedIn) {
       try {
         const [historyRes, statsRes] = await Promise.all([
           fetchHistory(0, 5),
           fetchStats(14),
         ]);
-        setHistoryItems(historyRes.data || []);
-        setTotalDetections(statsRes.data?.total_prediksi || 0);
-        setTopEmotion(statsRes.data?.emosi_dominan || "-");
+        // fetchHistory/fetchStats sudah mengembalikan isi respons (response.data),
+        // jadi datanya ada di historyRes.items dan statsRes.total_prediksi.
+        setHistoryItems(
+          (historyRes.items || []).map(
+            (p: {
+              id: number;
+              source: string;
+              created_at: string;
+              faces?: Array<{ top_label: string; confidence: number }>;
+            }) => ({
+              id: String(p.id),
+              imagePreview: "",
+              predictedEmotion: p.faces?.[0]?.top_label || "neutral",
+              confidence: p.faces?.[0]?.confidence || 0,
+              modelUsed:
+                p.source === "webcam" ? "Webcam Stream" : "Image Upload",
+              createdAt: p.created_at,
+            }),
+          ),
+        );
+        setTotalDetections(statsRes.total_prediksi || 0);
+        setTopEmotion(statsRes.ekspresi_terbanyak || "-");
       } catch {
         setHistoryItems([]);
       }
@@ -65,10 +86,11 @@ export default function OverviewPage() {
     setLoading(false);
   };
 
-  // HANYA dipanggil sekali saat mount
+  // Dimuat sekali setelah status login diketahui, agar data Guest tidak tampil untuk user yang login.
   useEffect(() => {
+    if (status === "loading") return;
     loadOverviewData();
-  }, []);
+  }, [status]);
 
   const handleRefresh = () => {
     loadOverviewData();
@@ -124,7 +146,7 @@ export default function OverviewPage() {
       </div>
 
       {/* Banner Imbauan Guest */}
-      {!session && (
+      {!isLoggedIn && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-warning/30 bg-warning/10 p-5 text-xs text-warning-foreground shadow-sm">
           <div className="flex items-start sm:items-center gap-3">
             <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5 sm:mt-0" />
@@ -184,7 +206,7 @@ export default function OverviewPage() {
               Status Penyimpanan
             </span>
             <div className="text-sm font-bold text-foreground">
-              {session ? (
+              {isLoggedIn ? (
                 <span className="text-success flex items-center gap-1">
                   ● Database Tersambung
                 </span>
