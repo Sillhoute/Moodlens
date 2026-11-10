@@ -6,8 +6,10 @@ services:
     image: postgres:15-alpine
     container_name: moodlens-db
     restart: always
-    env_file:
-      - ./backend/.env.deploy
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
@@ -22,8 +24,16 @@ services:
       dockerfile: Dockerfile
     container_name: moodlens-backend
     restart: always
-    env_file:
-      - ./backend/.env.deploy
+    environment:
+      PORT: ${PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${DB_PORT}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      DATABASE_URL: ${DATABASE_URL}
     ports:
       - "9000:9000"
     depends_on:
@@ -40,8 +50,13 @@ services:
         - NEXT_PUBLIC_API_URL=http://localhost:9000/api
     container_name: moodlens-frontend
     restart: always
-    env_file:
-      - ./frontend/.env.deploy
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      AUTH_URL: ${AUTH_URL}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST}
+      AUTH_SECRET: ${AUTH_SECRET}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
     ports:
       - "4000:4000"
     depends_on:

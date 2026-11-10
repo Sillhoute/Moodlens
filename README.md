@@ -80,12 +80,13 @@ Berdasarkan hasil pengujian pada 7.178 gambar uji (_Classification Report_ dan _
 
 ---
 
-## Panduan Konfigurasi Environment (`.env` vs `.env.deploy`)
+## Panduan Konfigurasi Environment (`.env` dan `.env.example`)
 
-Proyek ini membedakan file environment agar konfigurasi pengembangan lokal (_development_) dan server/Docker (_deployment_) terpisah dengan jelas dan rapi:
+Proyek ini menggunakan 3 file template `.env.example` terpisah untuk memudahkan konfigurasi pengembangan lokal (_development_) maupun deployment Docker (_deployment_):
 
-- **`.env` / `backend/.env` / `frontend/.env`:** Digunakan khusus untuk pengembangan **lokal tanpa Docker** (saat menjalankan `bun run dev` secara langsung di mesin lokal).
-- **`.env.deploy` / `backend/.env.deploy` / `frontend/.env.deploy`:** Digunakan khusus untuk **deployment / Docker Container** (diatur untuk jaringan internal container dan port produksi seperti Frontend `4000` dan Backend `9000`).
+- **`.env.example` (di root):** Template variabel environment untuk konfigurasi root/Docker (misalnya `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`, `PORT`, `JWT_SECRET`, dll.).
+- **`backend/.env.example`:** Template variabel environment khusus untuk service Backend Express.
+- **`frontend/.env.example`:** Template variabel environment khusus untuk service Frontend Next.js.
 
 ---
 
@@ -98,36 +99,34 @@ Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan apl
 
 ### Struktur File Environment
 
-Konfigurasi environment dipisahkan berdasarkan target runtime (Lokal vs Docker Deployment):
+Konfigurasi environment menggunakan template `.env.example` yang disalin menjadi `.env` pada masing-masing direktori:
 
-| File Target Deployment / Docker                     | File Target Development Lokal | Dipakai oleh                       | Port (Frontend / Backend)             |
-| --------------------------------------------------- | ----------------------------- | ---------------------------------- | ------------------------------------- |
-| `.env.deploy` (di-copy ke `.env` saat compose)      | `.env` (di folder utama)      | `docker compose` (3 container)     | Frontend `4000`, Backend `9000`       |
-| `backend/.env.deploy` (di-copy ke `backend/.env`)   | `backend/.env`                | `bun run dev` di folder `backend`  | Port `8000` (Lokal) / `9000` (Docker) |
-| `frontend/.env.deploy` (di-copy ke `frontend/.env`) | `frontend/.env`               | `bun run dev` di folder `frontend` | Port `3000` (Lokal) / `4000` (Docker) |
-| GitHub Secrets                                      | -                             | Job `deploy` di pipeline CI/CD     | Frontend `4000`, Backend `9000`       |
+| File Template Contoh    | File Target (Lokal / Deployment) | Keterangan / Cakupan Variabel                        |
+| ----------------------- | -------------------------------- | ---------------------------------------------------- |
+| `.env.example`          | `.env` (di root folder)          | Variabel root / Docker compose (DB, Port, JWT, Auth) |
+| `backend/.env.example`  | `backend/.env`                   | Konfigurasi spesifik backend Express & Prisma        |
+| `frontend/.env.example` | `frontend/.env`                  | Konfigurasi spesifik frontend Next.js & NextAuth     |
 
-Semua file `.env` maupun `.env.deploy` diabaikan oleh Git (`.gitignore`), sehingga kata sandi dan kunci rahasia tidak pernah masuk ke repository.
+Semua file `.env` diabaikan oleh Git (`.gitignore`), sehingga kata sandi dan kunci rahasia tidak pernah masuk ke repository.
 
 ---
 
 ### A. Menjalankan dengan Docker Compose (Deployment / Container Mode)
 
-Untuk menggunakan konfigurasi deployment Docker, pastikan file `.env.deploy` disalin menjadi `.env` sesuai targetnya:
+Untuk menggunakan konfigurasi deployment Docker dengan file `.env` tunggal di root, pastikan Anda menyiapkan file `.env` dari template:
 
-1. **Menyiapkan File Environment Deployment:**
+1. **Menyiapkan File Environment Root:**
+   Salin `.env.example` menjadi `.env` di root folder, lalu sesuaikan isinya:
 
    ```bash
-   copy .env.deploy .env
-   copy backend\.env.deploy backend\.env
-   copy frontend\.env.deploy frontend\.env
+   cp .env.example .env
    ```
 
-   _(Untuk Linux/macOS gunakan perintah `cp`)_
+   _(Atau gunakan perintah `copy .env.example .env` di Windows)_
 
 2. **Jalankan Docker Compose:**
    - **Menggunakan Image Hasil Build CI/CD dari Docker Hub (Tanpa Build Ulang):**
-     Pastikan `IMAGE_PREFIX` dan `IMAGE_TAG` sudah terkonfigurasi di `.env`, lalu jalankan:
+     Pastikan image sudah tersedia, lalu jalankan:
      ```bash
      docker compose up -d --pull always --no-build --wait
      ```
@@ -164,7 +163,7 @@ Jika Anda ingin melakukan pengembangan/fitur baru secara langsung tanpa containe
    bun run dev
    ```
 
-   `bun run dev` secara otomatis membuat lingkungan virtual Python (`venv`) dan memasang pustaka dari `requirements.txt`.
+   `bun run dev` secara otomatis membuat lingkungan virtual Python (`venv`).
 
 3. **Jalankan Service Frontend:**
    Salin `frontend/.env.example` menjadi `frontend/.env` (sesuaikan port backend ke `8000`), lalu jalankan perintah berikut di folder `frontend`:
@@ -174,22 +173,6 @@ Jika Anda ingin melakukan pengembangan/fitur baru secara langsung tanpa containe
    bun run dev
    ```
    Aplikasi Next.js akan terbuka di port `3000`.
-
----
-
-### Menjalankan Pengujian (Testing)
-
-- **Backend Integration & Unit Test:**
-
-  ```bash
-  cd backend && bun run test
-  ```
-
-- **Machine Learning Inference Test:**
-  ```bash
-  cd backend && pip install -r requirements-dev.txt && python -m pytest -q tests
-  ```
-  _Pengujian Python memuat bobot model asli untuk menguji urutan label emosi, deteksi landmark wajah, serta validitas 3 pilihan inferensi model._
 
 ---
 
@@ -206,7 +189,7 @@ Workflow CI/CD diatur pada berkas `.github/workflows/ci-cd.yml` yang ter-trigger
    - Mengunggah image ke Docker Hub (`<username>/moodlens-backend` & `<username>/moodlens-frontend`) menggunakan tag `latest` dan commit SHA.
 3. **Deploy Phase:**
    - _Self-hosted runner_ mengeksekusi penarikan image terbaru dari Docker Hub.
-   - Menyiapkan environment `.env.deploy` dan mengaktifkan container melalui `docker compose up -d`.
+   - Menyiapkan environment dari file `.env` root dan mengaktifkan container melalui `docker compose up -d`.
    - Melakukan _smoke test_ ke endpoint `/api/health` serta halaman antarmuka frontend.
 
 **Konfigurasi Repository Secret (GitHub Actions Settings > Secrets and variables):**
