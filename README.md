@@ -6,13 +6,13 @@ Aplikasi web cerdas untuk pengenalan dan analisis ekspresi wajah berbasis _Deep 
 
 Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung melalui jaringan internal:
 
-| Container           | Teknologi Utama                              | Peran & Tanggung Jawab                                                                                                          | Port Akses |
-| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `moodlens-frontend` | Next.js, React, Nginx                        | Antarmuka pengguna (UI/UX), manajemen autentikasi sesi, dan reverse proxy untuk routing `/api`.                                 | `4000`     |
-| `moodlens-backend`  | Python, Express.js / Bun, TensorFlow, OpenCV | Layanan inti untuk autentikasi user, deteksi wajah (BlazeFace/OpenCV), inferensi model, manajemen riwayat, dan statistik emosi. | `9000`     |
-| `moodlens-db`       | PostgreSQL 15, Volume Persistent             | Menyimpan data akun pengguna (terenkripsi bcrypt) dan rekam jejak riwayat prediksi emosi.                                       | `5432`     |
+| Container  | Teknologi Utama                                      | Peran & Tanggung Jawab                                                                                      | Port Akses |
+| ---------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------- |
+| `frontend` | Next.js, React, NextAuth                             | Antarmuka pengguna (UI/UX) dan manajemen autentikasi sesi. Browser memanggil backend langsung di port 9000. | `4000`     |
+| `backend`  | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah, inferensi model pilihan, riwayat, dan statistik emosi.                     | `9000`     |
+| `database` | PostgreSQL 15, Volume Persistent                     | Menyimpan data akun pengguna (password di-hash bcrypt) dan riwayat prediksi. Hanya bisa diakses backend.    | -          |
 
-> **Privasi & Keamanan:** Citra wajah mentah yang diproses melalui unggahan foto atau _webcam_ hanya diekstrak di memori volatil (_runtime memory_) dan **tidak pernah disimpan** ke database maupun penyimpanan disk. Database hanya menyimpan metadata hasil prediksi emosi dan statistik terkait.
+> **Privasi & Keamanan:** Citra wajah mentah yang diproses melalui unggahan foto atau _webcam_ hanya diekstrak di memori volatil (_runtime memory_) dan **tidak pernah disimpan** ke database maupun penyimpanan disk.
 
 ---
 
@@ -35,14 +35,14 @@ Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang 
 
 ### Penggunaan Ambang Batas Keyakinan ($\tau$)
 
-- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru. Backend juga memvalidasi integritas file model menggunakan verifikasi SHA-256 saat pertama kali dinyalakan.
+- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru.
 
 ### Metrik Performa Evaluasi Model
 
 | Model / Arsitektur   | Akurasi Pengujian | Macro F1-Score | Keterangan                                         |
 | -------------------- | ----------------- | -------------- | -------------------------------------------------- |
-| Custom Residual CNN  | 56,0%             | 0,570          | Cepat & ringan untuk ekstraksi fitur spasial dasar |
-| Pre-trained ResNet50 | 61,0%             | 0,597          | Unggul dalam ekstraksi pola visual kompleks (+5%)  |
+| Custom Residual CNN  | 56,0%             | 0,51           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
+| Pre-trained ResNet50 | 61,0%             | 0,59           | Unggul dalam ekstraksi pola visual kompleks (+5%)  |
 
 ---
 
@@ -58,36 +58,65 @@ Berdasarkan hasil pengujian pada 7.178 gambar uji (mengacu pada _Classification 
    - **Karakteristik Visual:** Bentuk geometri mata melotot dan mulut terbuka membulat (berbentuk huruf O) memberikan fitur pembeda yang sangat khas.
 3. **Neutral (Datar):**
    - **Performa:** Cukup konsisten dengan tingkat identifikasi yang stabil.
-   - **Karakteristik Visual:** Minim tarikan otot ekstrem. Namun, sering kali mengalami tumpang tindih (_overlap_) dengan ekspresi _Sad_ atau _Angry_ pada kondisi wajah _resting face_.
+   - **Karakteristik Visual:** Minim tarikan otot ekstrem. Namun, sering kali mengalami tumpang tindih (_overlap_) dengan ekspresi _Sad_ atau _Angry_.
 4. **Angry (Marah):**
    - **Performa:** Moderat (Precision ~42–50%, Recall ~51–57%).
-   - **Karakteristik Visual:** Berfokus pada kerutan alis ke arah bawah dan ketegangan rahang. Sering tertukar dengan ekspresi sedih atau netral karena variasi intensitas kerutan antar individu.
+   - **Karakteristik Visual:** Berfokus pada kerutan alis ke arah bawah dan ketegangan rahang.
 5. **Disgust (Jijik):**
-   - **Performa:** Memiliki jumlah sampel paling sedikit dalam dataset (111 sampel uji), namun penerapan _class weight_ berhasil mendongkrak performa ResNet50 secara signifikan.
+   - **Performa:** Memiliki jumlah sampel paling sedikit dalam dataset (111 sampel uji).
    - **Karakteristik Visual:** Kerutan pada hidung bagian atas dan bibir atas yang terangkat.
 6. **Sad (Sedih):**
    - **Performa:** Menjadi salah satu tantangan kasus tersulit dalam klasifikasi ekspresi.
-   - **Karakteristik Visual:** Cenderung salah diklasifikasikan sebagai _Neutral_ atau _Fear_ akibat kemiripan mikro-ekspresi pada bagian mulut dan mata yang sayu.
+   - **Karakteristik Visual:** Cenderung salah diklasifikasikan sebagai _Neutral_ atau _Fear_.
 7. **Fear (Takut):**
-   - **Performa:** Kategori emosi paling kompleks (Vanilla CNN mencatat _recall_ 21%, yang berhasil ditingkatkan ResNet50 menjadi 40%).
-   - **Karakteristik Visual:** Memuat elemen gabungan antara mata membesar (mirip _Surprise_) dan mulut menegang/mengerut (mirip _Sad_).
+   - **Performa:** Kategori emosi paling kompleks.
+   - **Karakteristik Visual:** Memuat elemen gabungan antara mata membesar dan mulut menegang.
 
 ---
 
-## Panduan Menjalankan Secara Lokal
+## Panduan Konfigurasi `.env` (Lokal vs Deploy)
+
+Proyek ini membedakan file environment agar Anda tidak keliru antara pengembangan lokal (_development_) dan server produksi (_deployment_):
+
+- **`.env` / `backend/.env` / `frontend/.env`:** Digunakan khusus untuk pengembangan **lokal** (tanpa Docker atau saat menjalankan `bun run dev`).
+- **`.env.deploy` / `backend/.env.deploy` / `frontend/.env.deploy`:** Digunakan khusus untuk **deployment / Docker** (diatur menggunakan port produksi seperti Frontend `4000` dan Backend `9000`).
+
+---
+
+## Panduan Menjalankan Secara Lokal & Deploy
 
 Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan aplikasi:
 
-- Docker Desktop aktif dengan alokasi memori minimal 4 GB dan ruang disk kosong $\approx 5$ GB.
-- Bun / Node.js dan Python 3.10+ (jika ingin menjalankan pengujian secara lokal).
+- Docker Desktop aktif dengan alokasi memori minimal 4 GB.
 
-### Langkah Instalasi & Eksekusi:
+### A. Cara Cepat Deploy dengan Docker
 
-1. **Konfigurasi Lingkungan (.env):**
-   Simpan file konfigurasi lingkungan Anda di masing-masing folder (`backend/.env` dan `frontend/.env`). Pastikan parameter seperti `POSTGRES_PASSWORD` dan `JWT_SECRET` telah disesuaikan. Jangan pernah memindahkan atau meng-commit file rahasia ke repositori publik.
+Jika ingin langsung menjalankan aplikasi di server menggunakan Docker Compose, Anda cukup memakai file `.env.deploy` yang sudah tersedia:
 
-2. **Menjalankan Container via Docker Compose:**
-   Buka terminal di direktori root proyek, lalu jalankan perintah berikut:
+```bash
+docker compose up -d --build --wait
+```
+
+Aplikasi langsung aktif secara otomatis:
+
+- **Frontend:** `http://localhost:4000`
+- **Backend API Health:** `http://localhost:9000/api/health`
+
+### B. Tanpa Docker (Mode Development Lokal)
+
+1. Jalankan database:
    ```bash
-   docker compose up -d --build --wait
+   docker run --name fer-postgres -e POSTGRES_USER=fer -e POSTGRES_PASSWORD=rahasia -e POSTGRES_DB=fer_db -p 5434:5432 -d postgres:15-alpine
    ```
+2. Backend: Masuk ke folder `backend`, salin file `.env` (menggunakan konfigurasi lokal), lalu jalankan `bun install`, `bun run db:push`, dan `bun run dev` (port 8000).
+3. Frontend: Masuk ke folder `frontend`, salin file `.env` lokal, lalu jalankan `bun install` dan `bun run dev` (port 3000).
+
+---
+
+## Alur CI/CD
+
+Workflow ada di `.github/workflows/ci-cd.yml` dan berjalan otomatis setiap ada push ke branch `main`:
+
+1. **Test:** Menjalankan pengecekan test backend dan frontend.
+2. **Build & Push:** Membuat image Docker dan mengirimkannya ke GitHub Container Registry (GHCR).
+3. **Deploy:** Melakukan pembaruan otomatis pada server target.

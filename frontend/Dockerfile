@@ -4,8 +4,6 @@ FROM node:20-alpine AS base
 # Install dependencies hanya jika diperlukan
 FROM base AS deps
 WORKDIR /app
-
-# Salin file package manager (mendukung npm/pnpm/yarn/bun)
 COPY package.json package-lock.json* bun.lockb* ./
 RUN \
   if [ -f bun.lockb ]; then npm install -g bun && bun install --frozen-lockfile; \
@@ -19,11 +17,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Tangkap ARG dari luar, lalu jadikan ENV saat build Next.js
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Jalankan build Next.js menggunakan npm/npx standar Node.js
-COPY .env.deploy .env.production
+# Jalankan build Next.js
 RUN npm run build
 
 # 3. Runner Stage (Production image yang ringan)
@@ -46,5 +47,4 @@ USER nextjs
 
 EXPOSE 4000
 
-# Jalankan server Next.js standalone menggunakan Node
 CMD ["node", "server.js"]

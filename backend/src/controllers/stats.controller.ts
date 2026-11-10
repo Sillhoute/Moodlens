@@ -2,14 +2,15 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middlewares/auth.middleware";
 import { prisma } from "../config/prisma";
 
+// Urutan sama dengan EMOTION_CLASSES di predict_worker.py (urutan kelas saat training).
 export const EMOTION_CLASSES = [
   "angry",
   "disgust",
   "fear",
   "happy",
+  "neutral",
   "sad",
   "surprise",
-  "neutral",
 ];
 
 export async function getStats(req: AuthenticatedRequest, res: Response) {

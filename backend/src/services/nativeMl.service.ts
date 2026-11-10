@@ -204,6 +204,11 @@ function sendPrediction(
   });
 }
 
+// Dipakai /api/health: model dianggap siap kalau worker sudah memuat kedua model.
+export function isMlReady(): boolean {
+  return Boolean(worker?.ready && !worker.failed);
+}
+
 export async function startNativeMlWorker(): Promise<void> {
   await getReadyWorker();
 }
