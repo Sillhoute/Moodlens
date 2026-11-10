@@ -6,10 +6,10 @@ Aplikasi web cerdas untuk pengenalan dan analisis ekspresi wajah berbasis _Deep 
 
 Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung melalui jaringan internal:
 
-| Container  | Teknologi Utama                                      | Peran & Tanggung Jawab                                                                                     | Port Akses |
-| ---------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------- |
+| Container  | Teknologi Utama                                      | Peran & Tanggung Jawab                                                                                      | Port Akses |
+| ---------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------- |
 | `frontend` | Next.js, React, NextAuth                             | Antarmuka pengguna (UI/UX) dan manajemen autentikasi sesi. Browser memanggil backend langsung di port 9000. | `4000`     |
-| `backend`  | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah, inferensi model pilihan, riwayat, dan statistik emosi.                    | `9000`     |
+| `backend`  | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah, inferensi model pilihan, riwayat, dan statistik emosi.                     | `9000`     |
 | `database` | PostgreSQL 15, Volume Persistent                     | Menyimpan data akun pengguna (password di-hash bcrypt) dan riwayat prediksi. Hanya bisa diakses backend.    | -          |
 
 > **Privasi & Keamanan:** Citra wajah mentah yang diproses melalui unggahan foto atau _webcam_ hanya diekstrak di memori volatil (_runtime memory_) dan **tidak pernah disimpan** ke database maupun penyimpanan disk.
@@ -30,19 +30,25 @@ Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung mel
 
 Sistem ini menggunakan dua model Deep Learning yang dilatih dengan dataset **FER-2013** (28.709 citra latih, 7.178 citra uji), ditambah gabungan keduanya:
 
-1. **Custom Residual CNN (Vanilla):** Arsitektur konvolusi buatan sendiri dengan _skip connections_ (residual block) yang efisien untuk mengekstraksi fitur pola spasial dasar pada citra grayscale $48 \times 48$ piksel.
-2. **Pre-trained ResNet50 (Transfer Learning):** Menggunakan bobot pra-latih _ImageNet_ yang di-fine-tune untuk menangkap struktur anatomi wajah yang lebih kompleks dan mendalam.
+1. **Custom Residual CNN (Vanilla):** 1 konvolusi awal dan 3 _residual block_ (64, 128, 256 filter) dengan konvolusi tanpa bias dan ReLU setelah _BatchNormalization_. Input citra grayscale $48 \times 48$ piksel, sekitar 1,3 juta parameter.
+2. **Pre-trained ResNet50 (Transfer Learning):** Bobot pra-latih _ImageNet_; citra diubah ke RGB dan di-_resize_ ke $96 \times 96$ di dalam model, dengan _fine-tuning_ pada 30 layer teratas.
+3. **Ensemble (Soft Voting):** Rata-rata probabilitas kedua model. Menjadi pilihan default di halaman prediksi.
+
+Kedua model dilatih dengan _class weight_ untuk mengatasi kelas yang tidak seimbang (misalnya _disgust_ hanya 1,5% data).
 
 ### Penggunaan Ambang Batas Keyakinan ($\tau$)
 
-- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru.
+- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah $\tau = 0,5$, wajah ditandai **"Ekspresi kurang jelas"**. Pada model ensemble, 54,5% citra uji melewati ambang ini, dengan akurasi 79,6%.
 
 ### Metrik Performa Evaluasi Model
 
 | Model / Arsitektur   | Akurasi Pengujian | Macro F1-Score | Keterangan                                         |
 | -------------------- | ----------------- | -------------- | -------------------------------------------------- |
-| Custom Residual CNN  | 56,0%             | 0,51           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
-| Pre-trained ResNet50 | 61,0%             | 0,59           | Unggul dalam ekstraksi pola visual kompleks (+5%)  |
+| Custom Residual CNN  | 51,3%             | 0,44           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
+| Pre-trained ResNet50 | 61,7%             | 0,60           | Unggul dalam ekstraksi pola visual kompleks        |
+| Ensemble             | 62,7%             | 0,59           | Gabungan probabilitas kedua model                  |
+
+Sumber angka: `notebook/UTS_Modip.ipynb` (training dan evaluasi) dan `notebook/Pembahasan_Modip.ipynb` (ensemble, ambang keyakinan, dan eksperimen _fine-tuning_).
 
 ---
 
@@ -51,26 +57,26 @@ Sistem ini menggunakan dua model Deep Learning yang dilatih dengan dataset **FER
 Berdasarkan hasil pengujian pada 7.178 gambar uji (_Classification Report_ dan _Confusion Matrix_), berikut karakteristik dan performa pengenalan untuk masing-masing dari 7 kelas emosi:
 
 1. **Happy (Senang):**
-   - **Performa:** Merupakan kelas dengan akurasi dan stabilitas tertinggi (Precision ~85-87%, Recall ~77-78%).
-   - **Karakteristik Visual:** Struktur senyuman lebar, pipi terangkat, serta kerutan di sudut mata sangat dominan dan mudah dikenali oleh filter konvolusi.
+   - **Performa:** Kelas dengan hasil terbaik (precision 83–85%, recall 71–78%).
+   - **Karakteristik Visual:** Struktur senyuman lebar, pipi terangkat, serta kerutan di sudut mata sangat dominan dan mudah dikenali.
 2. **Surprise (Terkejut):**
-   - **Performa:** Sangat akurat dengan tingkat _recall_ mencapai 79–80%.
-   - **Karakteristik Visual:** Bentuk geometri mata melotot dan mulut terbuka membulat (berbentuk huruf O) memberikan fitur pembeda yang sangat khas.
+   - **Performa:** Recall 80–81% pada kedua model.
+   - **Karakteristik Visual:** Bentuk mata melotot dan mulut terbuka membulat (huruf O) memberikan fitur pembeda yang kuat.
 3. **Neutral (Datar):**
-   - **Performa:** Cukup konsisten dengan tingkat identifikasi yang stabil.
-   - **Karakteristik Visual:** Minim tarikan otot ekstrem. Namun, sering kali mengalami tumpang tindih (_overlap_) dengan ekspresi _Sad_ atau _Angry_.
+   - **Performa:** Recall cukup tinggi (65–69%), tetapi precision hanya 44–52%.
+   - **Karakteristik Visual:** Minim tarikan otot ekstrem, sering tumpang tindih dengan ekspresi sedih atau marah.
 4. **Angry (Marah):**
-   - **Performa:** Moderat (Precision ~42–50%, Recall ~51–57%).
+   - **Performa:** Moderat. Recall naik dari 28% (Vanilla) menjadi 57% (ResNet50).
    - **Karakteristik Visual:** Berfokus pada kerutan alis ke arah bawah dan ketegangan rahang.
 5. **Disgust (Jijik):**
-   - **Performa:** Memiliki jumlah sampel paling sedikit dalam dataset (111 sampel uji).
+   - **Performa:** Sampel paling sedikit (111 citra uji). Berkat _class weight_, recall mencapai 65–68%; precision ResNet50 53%.
    - **Karakteristik Visual:** Kerutan pada hidung bagian atas dan bibir atas yang terangkat.
 6. **Sad (Sedih):**
-   - **Performa:** Menjadi salah satu tantangan kasus tersulit dalam klasifikasi ekspresi.
-   - **Karakteristik Visual:** Cenderung salah diklasifikasikan sebagai _Neutral_ atau _Fear_.
+   - **Performa:** Salah satu kelas tersulit (recall 41–42%).
+   - **Karakteristik Visual:** Cenderung tertukar dengan _Neutral_ atau _Fear_ akibat kemiripan mikro-ekspresi.
 7. **Fear (Takut):**
-   - **Performa:** Kategori emosi paling kompleks.
-   - **Karakteristik Visual:** Memuat elemen gabungan antara mata membesar dan mulut menegang.
+   - **Performa:** Kelas paling sulit. Recall hanya 9% pada Vanilla, naik menjadi 40% pada ResNet50.
+   - **Karakteristik Visual:** Gabungan mata membesar dan mulut menegang/mengerut.
 
 ---
 
@@ -94,12 +100,12 @@ Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan apl
 
 Konfigurasi environment dipisahkan berdasarkan target runtime (Lokal vs Docker Deployment):
 
-| File Target Deployment / Docker                                                     | File Target Development Lokal                                                   | Dipakai oleh                       | Port (Frontend / Backend)   |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------- | --------------------------- |
-| `.env.deploy` (di-copy ke `.env` saat compose)                                      | `.env` (di folder utama)                                                        | `docker compose` (3 container)     | Frontend `4000`, Backend `9000` |
-| `backend/.env.deploy` (di-copy ke `backend/.env`)                                   | `backend/.env`                                                                  | `bun run dev` di folder `backend`  | Port `8000` (Lokal) / `9000` (Docker) |
-| `frontend/.env.deploy` (di-copy ke `frontend/.env`)                                 | `frontend/.env`                                                                 | `bun run dev` di folder `frontend` | Port `3000` (Lokal) / `4000` (Docker) |
-| GitHub Secrets                                                                      | -                                                                               | Job `deploy` di pipeline CI/CD     | Frontend `4000`, Backend `9000` |
+| File Target Deployment / Docker                     | File Target Development Lokal | Dipakai oleh                       | Port (Frontend / Backend)             |
+| --------------------------------------------------- | ----------------------------- | ---------------------------------- | ------------------------------------- |
+| `.env.deploy` (di-copy ke `.env` saat compose)      | `.env` (di folder utama)      | `docker compose` (3 container)     | Frontend `4000`, Backend `9000`       |
+| `backend/.env.deploy` (di-copy ke `backend/.env`)   | `backend/.env`                | `bun run dev` di folder `backend`  | Port `8000` (Lokal) / `9000` (Docker) |
+| `frontend/.env.deploy` (di-copy ke `frontend/.env`) | `frontend/.env`               | `bun run dev` di folder `frontend` | Port `3000` (Lokal) / `4000` (Docker) |
+| GitHub Secrets                                      | -                             | Job `deploy` di pipeline CI/CD     | Frontend `4000`, Backend `9000`       |
 
 Semua file `.env` maupun `.env.deploy` diabaikan oleh Git (`.gitignore`), sehingga kata sandi dan kunci rahasia tidak pernah masuk ke repository.
 
@@ -110,12 +116,14 @@ Semua file `.env` maupun `.env.deploy` diabaikan oleh Git (`.gitignore`), sehing
 Untuk menggunakan konfigurasi deployment Docker, pastikan file `.env.deploy` disalin menjadi `.env` sesuai targetnya:
 
 1. **Menyiapkan File Environment Deployment:**
+
    ```bash
    copy .env.deploy .env
    copy backend\.env.deploy backend\.env
    copy frontend\.env.deploy frontend\.env
    ```
-   *(Untuk Linux/macOS gunakan perintah `cp`)*
+
+   _(Untuk Linux/macOS gunakan perintah `cp`)_
 
 2. **Jalankan Docker Compose:**
    - **Menggunakan Image Hasil Build CI/CD dari Docker Hub (Tanpa Build Ulang):**
@@ -131,7 +139,7 @@ Untuk menggunakan konfigurasi deployment Docker, pastikan file `.env.deploy` dis
 3. **Akses Aplikasi:**
    - Frontend terbuka di <http://localhost:4000>
    - Backend API Health check di <http://localhost:9000/api/health>
-   - Database PostgreSQL berjalan di jaringan internal container (tabel dan skema dibuat otomatis via `prisma db push` saat backend container *booting*).
+   - Database PostgreSQL berjalan di jaringan internal container (tabel dan skema dibuat otomatis via `prisma db push` saat backend container _booting_).
 
 ---
 
@@ -140,12 +148,14 @@ Untuk menggunakan konfigurasi deployment Docker, pastikan file `.env.deploy` dis
 Jika Anda ingin melakukan pengembangan/fitur baru secara langsung tanpa container:
 
 1. **Jalankan Database PostgreSQL (misal via Docker terpisah):**
+
    ```bash
    docker run --name fer-postgres -e POSTGRES_USER=fer -e POSTGRES_PASSWORD=rahasia -e POSTGRES_DB=fer_db -p 5434:5432 -d postgres:15-alpine
    ```
 
 2. **Jalankan Service Backend:**
    Salin `backend/.env.example` menjadi `backend/.env` (sesuaikan port ke `8000`), lalu jalankan perintah berikut di folder `backend`:
+
    ```bash
    cd backend
    bun install
@@ -153,6 +163,7 @@ Jika Anda ingin melakukan pengembangan/fitur baru secara langsung tanpa containe
    bun run db:push
    bun run dev
    ```
+
    `bun run dev` secara otomatis membuat lingkungan virtual Python (`venv`) dan memasang pustaka dari `requirements.txt`.
 
 3. **Jalankan Service Frontend:**
@@ -169,6 +180,7 @@ Jika Anda ingin melakukan pengembangan/fitur baru secara langsung tanpa containe
 ### Menjalankan Pengujian (Testing)
 
 - **Backend Integration & Unit Test:**
+
   ```bash
   cd backend && bun run test
   ```
@@ -177,27 +189,28 @@ Jika Anda ingin melakukan pengembangan/fitur baru secara langsung tanpa containe
   ```bash
   cd backend && pip install -r requirements-dev.txt && python -m pytest -q tests
   ```
-  *Pengujian Python memuat bobot model asli untuk menguji urutan label emosi, deteksi landmark wajah, serta validitas 3 pilihan inferensi model.*
+  _Pengujian Python memuat bobot model asli untuk menguji urutan label emosi, deteksi landmark wajah, serta validitas 3 pilihan inferensi model._
 
 ---
 
 ## Alur Pipeline CI/CD
 
-Workflow CI/CD diatur pada berkas `.github/workflows/ci-cd.yml` yang ter-trigger otomatis saat terdapat perintah *push* ke branch `main` atau dijalankan secara manual via **Run workflow**:
+Workflow CI/CD diatur pada berkas `.github/workflows/ci-cd.yml` yang ter-trigger otomatis saat terdapat perintah _push_ ke branch `main` atau dijalankan secara manual via **Run workflow**:
 
-1. **Test Phase:** 
+1. **Test Phase:**
    - `test-backend`: Typechecking dan pengujian skrip Vitest.
    - `test-ml`: Pytest dengan memuat file bobot model asli (`.weights.h5`).
-   - `test-frontend`: Verifikasi *build production* Next.js.
-2. **Build & Push Phase:** 
+   - `test-frontend`: Verifikasi _build production_ Next.js.
+2. **Build & Push Phase:**
    - Mengompilasi Docker image backend & frontend di runner GitHub.
    - Mengunggah image ke Docker Hub (`<username>/moodlens-backend` & `<username>/moodlens-frontend`) menggunakan tag `latest` dan commit SHA.
-3. **Deploy Phase:** 
-   - *Self-hosted runner* mengeksekusi penarikan image terbaru dari Docker Hub.
+3. **Deploy Phase:**
+   - _Self-hosted runner_ mengeksekusi penarikan image terbaru dari Docker Hub.
    - Menyiapkan environment `.env.deploy` dan mengaktifkan container melalui `docker compose up -d`.
-   - Melakukan *smoke test* ke endpoint `/api/health` serta halaman antarmuka frontend.
+   - Melakukan _smoke test_ ke endpoint `/api/health` serta halaman antarmuka frontend.
 
 **Konfigurasi Repository Secret (GitHub Actions Settings > Secrets and variables):**
+
 - Variables: `DOCKERHUB_USERNAME`
 - Secrets: `DOCKERHUB_TOKEN`, `POSTGRES_PASSWORD`, `JWT_SECRET` (`AUTH_SECRET` opsional).
 
@@ -206,6 +219,6 @@ Workflow CI/CD diatur pada berkas `.github/workflows/ci-cd.yml` yang ter-trigger
 ## Struktur Notebook Model
 
 - `notebook/UTS_Modip.ipynb`: Eksplorasi dataset FER-2013, pelatihan model, serta evaluasi metrik Custom Residual CNN & ResNet50. Menghasilkan berkas bobot `.weights.h5` yang digunakan di backend.
-- `notebook/Pembahasan_Modip.ipynb`: Eksperimen pembuktian *Soft Voting Ensemble*, ambang batas keyakinan $\tau = 0,5$, serta analisis *selective fine-tuning* ResNet50.
+- `notebook/Pembahasan_Modip.ipynb`: Eksperimen pembuktian _Soft Voting Ensemble_, ambang batas keyakinan $\tau = 0,5$, serta analisis _selective fine-tuning_ ResNet50.
 
 > File bobot model tersimpan pada folder `backend/src/services/model/` (state optimizer telah dibersihkan agar berada di bawah ambang batas ukuran berkas GitHub 100 MB).
