@@ -48,7 +48,7 @@ Kedua model dilatih dengan _class weight_ untuk mengatasi kelas yang tidak seimb
 | Pre-trained ResNet50 | 61,7%             | 0,60           | Unggul dalam ekstraksi pola visual kompleks        |
 | Ensemble             | 62,7%             | 0,59           | Gabungan probabilitas kedua model                  |
 
-Sumber angka: `notebook/UTS_Modip.ipynb` (training dan evaluasi) dan `notebook/Pembahasan_Modip.ipynb` (ensemble, ambang keyakinan, dan eksperimen _fine-tuning_).
+Sumber angka: `notebook/UTS.ipynb` (training dan evaluasi) dan `notebook/Pembahasan.ipynb` (ensemble, ambang keyakinan, dan eksperimen _fine-tuning_).
 
 ---
 
