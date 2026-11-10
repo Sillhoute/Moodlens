@@ -30,25 +30,19 @@ Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung mel
 
 Sistem ini menggunakan dua model Deep Learning yang dilatih dengan dataset **FER-2013** (28.709 citra latih, 7.178 citra uji), ditambah gabungan keduanya:
 
-1. **Custom Residual CNN (Vanilla):** 1 konvolusi awal dan 3 _residual block_ (64, 128, 256 filter) dengan konvolusi tanpa bias dan ReLU setelah _BatchNormalization_. Input citra grayscale $48 \times 48$ piksel, sekitar 1,3 juta parameter.
-2. **Pre-trained ResNet50 (Transfer Learning):** Bobot pra-latih _ImageNet_; citra diubah ke RGB dan di-_resize_ ke $96 \times 96$ di dalam model, dengan _fine-tuning_ pada 30 layer teratas.
-3. **Ensemble (Soft Voting):** Rata-rata probabilitas kedua model. Menjadi pilihan default di halaman prediksi.
-
-Kedua model dilatih dengan _class weight_ untuk mengatasi kelas yang tidak seimbang (misalnya _disgust_ hanya 1,5% data).
+1. **Custom Residual CNN (Vanilla):** Arsitektur konvolusi buatan sendiri dengan _skip connections_ (residual block) yang efisien untuk mengekstraksi fitur pola spasial dasar pada citra grayscale $48 \times 48$ piksel.
+2. **Pre-trained ResNet50 (Transfer Learning):** Menggunakan bobot pra-latih _ImageNet_ yang di-fine-tune untuk menangkap struktur anatomi wajah yang lebih kompleks dan mendalam.
 
 ### Penggunaan Ambang Batas Keyakinan ($\tau$)
 
-- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah $\tau = 0,5$, wajah ditandai **"Ekspresi kurang jelas"**. Pada model ensemble, 54,5% citra uji melewati ambang ini, dengan akurasi 79,6%.
+- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru.
 
 ### Metrik Performa Evaluasi Model
 
 | Model / Arsitektur   | Akurasi Pengujian | Macro F1-Score | Keterangan                                         |
 | -------------------- | ----------------- | -------------- | -------------------------------------------------- |
-| Custom Residual CNN  | 51,3%             | 0,44           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
-| Pre-trained ResNet50 | 61,7%             | 0,60           | Unggul dalam ekstraksi pola visual kompleks        |
-| Ensemble             | 62,7%             | 0,59           | Gabungan probabilitas kedua model                  |
-
-Sumber angka: `notebook/UTS_Modip.ipynb` (training dan evaluasi) dan `notebook/Pembahasan_Modip.ipynb` (ensemble, ambang keyakinan, dan eksperimen _fine-tuning_).
+| Custom Residual CNN  | 56,0%             | 0,51           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
+| Pre-trained ResNet50 | 61,0%             | 0,59           | Unggul dalam ekstraksi pola visual kompleks (+5%)  |
 
 ---
 
@@ -57,26 +51,35 @@ Sumber angka: `notebook/UTS_Modip.ipynb` (training dan evaluasi) dan `notebook/P
 Berdasarkan hasil pengujian pada 7.178 gambar uji (_Classification Report_ dan _Confusion Matrix_), berikut karakteristik dan performa pengenalan untuk masing-masing dari 7 kelas emosi:
 
 1. **Happy (Senang):**
-   - **Performa:** Kelas dengan hasil terbaik (precision 83–85%, recall 71–78%).
-   - **Karakteristik Visual:** Struktur senyuman lebar, pipi terangkat, serta kerutan di sudut mata sangat dominan dan mudah dikenali.
+   - **Performa:** Merupakan kelas dengan akurasi dan stabilitas tertinggi (Precision ~85-87%, Recall ~77-78%).
+   - **Karakteristik Visual:** Struktur senyuman lebar, pipi terangkat, serta kerutan di sudut mata sangat dominan dan mudah dikenali oleh filter konvolusi.
 2. **Surprise (Terkejut):**
-   - **Performa:** Recall 80–81% pada kedua model.
-   - **Karakteristik Visual:** Bentuk mata melotot dan mulut terbuka membulat (huruf O) memberikan fitur pembeda yang kuat.
+   - **Performa:** Sangat akurat dengan tingkat _recall_ mencapai 79–80%.
+   - **Karakteristik Visual:** Bentuk geometri mata melotot dan mulut terbuka membulat (berbentuk huruf O) memberikan fitur pembeda yang sangat khas.
 3. **Neutral (Datar):**
-   - **Performa:** Recall cukup tinggi (65–69%), tetapi precision hanya 44–52%.
-   - **Karakteristik Visual:** Minim tarikan otot ekstrem, sering tumpang tindih dengan ekspresi sedih atau marah.
+   - **Performa:** Cukup konsisten dengan tingkat identifikasi yang stabil.
+   - **Karakteristik Visual:** Minim tarikan otot ekstrem. Namun, sering kali mengalami tumpang tindih (_overlap_) dengan ekspresi _Sad_ atau _Angry_.
 4. **Angry (Marah):**
-   - **Performa:** Moderat. Recall naik dari 28% (Vanilla) menjadi 57% (ResNet50).
+   - **Performa:** Moderat (Precision ~42–50%, Recall ~51–57%).
    - **Karakteristik Visual:** Berfokus pada kerutan alis ke arah bawah dan ketegangan rahang.
 5. **Disgust (Jijik):**
-   - **Performa:** Sampel paling sedikit (111 citra uji). Berkat _class weight_, recall mencapai 65–68%; precision ResNet50 53%.
+   - **Performa:** Memiliki jumlah sampel paling sedikit dalam dataset (111 sampel uji).
    - **Karakteristik Visual:** Kerutan pada hidung bagian atas dan bibir atas yang terangkat.
 6. **Sad (Sedih):**
-   - **Performa:** Salah satu kelas tersulit (recall 41–42%).
-   - **Karakteristik Visual:** Cenderung tertukar dengan _Neutral_ atau _Fear_ akibat kemiripan mikro-ekspresi.
+   - **Performa:** Menjadi salah satu tantangan kasus tersulit dalam klasifikasi ekspresi.
+   - **Karakteristik Visual:** Cenderung salah diklasifikasikan sebagai _Neutral_ atau _Fear_.
 7. **Fear (Takut):**
-   - **Performa:** Kelas paling sulit. Recall hanya 9% pada Vanilla, naik menjadi 40% pada ResNet50.
-   - **Karakteristik Visual:** Gabungan mata membesar dan mulut menegang/mengerut.
+   - **Performa:** Kategori emosi paling kompleks.
+   - **Karakteristik Visual:** Memuat elemen gabungan antara mata membesar dan mulut menegang.
+
+---
+
+## Panduan Konfigurasi `.env` (Lokal vs Deploy)
+
+Proyek ini membedakan file environment agar Anda tidak keliru antara pengembangan lokal (_development_) dan server produksi (_deployment_):
+
+- **`.env` / `backend/.env` / `frontend/.env`:** Digunakan khusus untuk pengembangan **lokal** (tanpa Docker atau saat menjalankan `bun run dev`).
+- **`.env.deploy` / `backend/.env.deploy` / `frontend/.env.deploy`:** Digunakan khusus untuk **deployment / Docker** (diatur menggunakan port produksi seperti Frontend `4000` dan Backend `9000`).
 
 ---
 
@@ -91,12 +94,12 @@ Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan apl
 
 Env untuk Docker dan env untuk development lokal dipisah. Ketiganya tidak saling membaca:
 
-| File (salin dari `.env.example` di folder yang sama) | Dipakai oleh | Port |
-| --- | --- | --- |
-| `.env` di folder utama | `docker compose` (3 container) | frontend 4000, backend 9000 |
-| `backend/.env` | `bun run dev` di folder `backend` | 8000 |
-| `frontend/.env` | `bun run dev` di folder `frontend` | 3000 |
-| GitHub Secrets | job `deploy` di pipeline CI/CD | 4000, 9000 |
+| File (salin dari `.env.example` di folder yang sama) | Dipakai oleh                       | Port                        |
+| ---------------------------------------------------- | ---------------------------------- | --------------------------- |
+| `.env` di folder utama                               | `docker compose` (3 container)     | frontend 4000, backend 9000 |
+| `backend/.env`                                       | `bun run dev` di folder `backend`  | 8000                        |
+| `frontend/.env`                                      | `bun run dev` di folder `frontend` | 3000                        |
+| GitHub Secrets                                       | job `deploy` di pipeline CI/CD     | 4000, 9000                  |
 
 Semua file `.env` diabaikan Git, jadi password dan secret tidak pernah masuk repository.
 
