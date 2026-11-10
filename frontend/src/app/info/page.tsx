@@ -85,7 +85,7 @@ export default function InfoPage() {
             <p>
               <strong className="text-foreground">Akurasi Eksperimen:</strong>{" "}
               Meningkat drastis dari versi beku (47%) menjadi{" "}
-              <strong>60.0%</strong> (Macro F1: 0.57) setelah fine-tuning,
+              <strong>61.0%</strong> (Macro F1: 0.57) setelah fine-tuning,
               menjadikannya model individu terbaik.
             </p>
           </div>
@@ -94,7 +94,7 @@ export default function InfoPage() {
               Akurasi Pengujian (Test Set)
             </span>
             <span className="text-2xl font-black text-gradient-brand">
-              60% (+13%)
+              61% (+13%)
             </span>
           </div>
         </div>
