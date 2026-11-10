@@ -31,7 +31,7 @@ Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung mel
 Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang dilatih menggunakan dataset **FER-2013**:
 
 1. **Custom Residual CNN (Vanilla):** Arsitektur konvolusi buatan sendiri dengan _skip connections_ (residual block) yang efisien untuk mengekstraksi fitur pola spasial dasar pada citra grayscale $48 \times 48$ piksel.
-2. **Pre-trained ResNet50 (Transfer Learning):** Menggunakan bobot pra-latih _ImageNet_ dengan pipeline GPU internal (grayscale_to_rgb, resizing ke $96 \times 96$) serta teknik _fine-tuning_ pada 30 layer teratas.
+2. **Pre-trained ResNet50 (Transfer Learning):** Menggunakan bobot pra-latih _ImageNet_ dengan pipeline GPU internal (grayscale*to_rgb, resizing ke $96 \times 96$) serta teknik \_fine-tuning* pada 30 layer teratas.
 
 ### Penggunaan Ambang Batas Keyakinan ($\tau$)
 
@@ -42,7 +42,7 @@ Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang 
 | Model / Arsitektur   | Akurasi Pengujian | Macro F1-Score | Keterangan                                         |
 | -------------------- | ----------------- | -------------- | -------------------------------------------------- |
 | Custom Residual CNN  | 57,0%             | 0,51           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
-| Pre-trained ResNet50 | 60,0%             | 0,57           | Unggul dalam ekstraksi pola visual kompleks        |
+| Pre-trained ResNet50 | 61,0%             | 0,57           | Unggul dalam ekstraksi pola visual kompleks        |
 
 ---
 

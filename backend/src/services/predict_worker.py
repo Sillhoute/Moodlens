@@ -23,8 +23,8 @@ MAX_FACES = 10
 YUNET_SCORE_THRESHOLD = 0.7
 YUNET_NMS_THRESHOLD = 0.3
 MODEL_SPECS = {
-    "vanilla": "best_vanilla_modified_fer_model.weights.h5",
-    "resnet50": "best_resnet_modified_fer.weights.h5",
+    "vanilla": "best_vanilla_fer_model.weights.h5",
+    "resnet50": "best_resnet_fer.weights.h5",
 }
 
 
