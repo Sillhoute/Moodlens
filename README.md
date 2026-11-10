@@ -6,10 +6,10 @@ Aplikasi web cerdas untuk pengenalan dan analisis ekspresi wajah berbasis _Deep 
 
 Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung melalui jaringan internal:
 
-| Container  | Teknologi Utama                                      | Peran & Tanggung Jawab                                                                                      | Port Akses |
-| ---------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------- |
+| Container  | Teknologi Utama                                      | Peran & Tanggung Jawab                                                                                     | Port Akses |
+| ---------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------- |
 | `frontend` | Next.js, React, NextAuth                             | Antarmuka pengguna (UI/UX) dan manajemen autentikasi sesi. Browser memanggil backend langsung di port 9000. | `4000`     |
-| `backend`  | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah, inferensi model pilihan, riwayat, dan statistik emosi.                     | `9000`     |
+| `backend`  | Express.js / Bun, Prisma, Python, TensorFlow, OpenCV | Autentikasi user, deteksi wajah, inferensi model pilihan, riwayat, dan statistik emosi.                    | `9000`     |
 | `database` | PostgreSQL 15, Volume Persistent                     | Menyimpan data akun pengguna (password di-hash bcrypt) dan riwayat prediksi. Hanya bisa diakses backend.    | -          |
 
 > **Privasi & Keamanan:** Citra wajah mentah yang diproses melalui unggahan foto atau _webcam_ hanya diekstrak di memori volatil (_runtime memory_) dan **tidak pernah disimpan** ke database maupun penyimpanan disk.
@@ -74,12 +74,12 @@ Berdasarkan hasil pengujian pada 7.178 gambar uji (_Classification Report_ dan _
 
 ---
 
-## Panduan Konfigurasi `.env` (Lokal vs Deploy)
+## Panduan Konfigurasi Environment (`.env` vs `.env.deploy`)
 
-Proyek ini membedakan file environment agar Anda tidak keliru antara pengembangan lokal (_development_) dan server produksi (_deployment_):
+Proyek ini membedakan file environment agar konfigurasi pengembangan lokal (_development_) dan server/Docker (_deployment_) terpisah dengan jelas dan rapi:
 
-- **`.env` / `backend/.env` / `frontend/.env`:** Digunakan khusus untuk pengembangan **lokal** (tanpa Docker atau saat menjalankan `bun run dev`).
-- **`.env.deploy` / `backend/.env.deploy` / `frontend/.env.deploy`:** Digunakan khusus untuk **deployment / Docker** (diatur menggunakan port produksi seperti Frontend `4000` dan Backend `9000`).
+- **`.env` / `backend/.env` / `frontend/.env`:** Digunakan khusus untuk pengembangan **lokal tanpa Docker** (saat menjalankan `bun run dev` secara langsung di mesin lokal).
+- **`.env.deploy` / `backend/.env.deploy` / `frontend/.env.deploy`:** Digunakan khusus untuk **deployment / Docker Container** (diatur untuk jaringan internal container dan port produksi seperti Frontend `4000` dan Backend `9000`).
 
 ---
 
@@ -88,84 +88,124 @@ Proyek ini membedakan file environment agar Anda tidak keliru antara pengembanga
 Pastikan perangkat Anda telah memenuhi prasyarat berikut sebelum menjalankan aplikasi:
 
 - Docker Desktop aktif dengan alokasi memori minimal 4 GB dan ruang disk kosong sekitar 6 GB.
-- Bun / Node.js dan Python 3.11 (jika ingin menjalankan pengujian secara lokal).
+- Bun / Node.js dan Python 3.11 (jika ingin menjalankan pengujian atau mode development tanpa Docker secara lokal).
 
-### File env: mana dipakai untuk apa
+### Struktur File Environment
 
-Env untuk Docker dan env untuk development lokal dipisah. Ketiganya tidak saling membaca:
+Konfigurasi environment dipisahkan berdasarkan target runtime (Lokal vs Docker Deployment):
 
-| File (salin dari `.env.example` di folder yang sama) | Dipakai oleh                       | Port                        |
-| ---------------------------------------------------- | ---------------------------------- | --------------------------- |
-| `.env` di folder utama                               | `docker compose` (3 container)     | frontend 4000, backend 9000 |
-| `backend/.env`                                       | `bun run dev` di folder `backend`  | 8000                        |
-| `frontend/.env`                                      | `bun run dev` di folder `frontend` | 3000                        |
-| GitHub Secrets                                       | job `deploy` di pipeline CI/CD     | 4000, 9000                  |
+| File Target Deployment / Docker                                                     | File Target Development Lokal                                                   | Dipakai oleh                       | Port (Frontend / Backend)   |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------- | --------------------------- |
+| `.env.deploy` (di-copy ke `.env` saat compose)                                      | `.env` (di folder utama)                                                        | `docker compose` (3 container)     | Frontend `4000`, Backend `9000` |
+| `backend/.env.deploy` (di-copy ke `backend/.env`)                                   | `backend/.env`                                                                  | `bun run dev` di folder `backend`  | Port `8000` (Lokal) / `9000` (Docker) |
+| `frontend/.env.deploy` (di-copy ke `frontend/.env`)                                 | `frontend/.env`                                                                 | `bun run dev` di folder `frontend` | Port `3000` (Lokal) / `4000` (Docker) |
+| GitHub Secrets                                                                      | -                                                                               | Job `deploy` di pipeline CI/CD     | Frontend `4000`, Backend `9000` |
 
-Semua file `.env` diabaikan Git, jadi password dan secret tidak pernah masuk repository.
+Semua file `.env` maupun `.env.deploy` diabaikan oleh Git (`.gitignore`), sehingga kata sandi dan kunci rahasia tidak pernah masuk ke repository.
 
-### A. Dengan Docker Compose (3 container)
+---
 
-1. Salin `.env.example` di folder utama menjadi `.env`, lalu ganti `POSTGRES_PASSWORD`, `JWT_SECRET`, dan `AUTH_SECRET`.
+### A. Menjalankan dengan Docker Compose (Deployment / Container Mode)
 
+Untuk menggunakan konfigurasi deployment Docker, pastikan file `.env.deploy` disalin menjadi `.env` sesuai targetnya:
+
+1. **Menyiapkan File Environment Deployment:**
    ```bash
-   copy .env.example .env
+   copy .env.deploy .env
+   copy backend\.env.deploy backend\.env
+   copy frontend\.env.deploy frontend\.env
    ```
+   *(Untuk Linux/macOS gunakan perintah `cp`)*
 
-2. Jalankan salah satu:
-   - **Pakai image hasil pipeline dari Docker Hub (tanpa build):** hapus tanda `#` di depan `IMAGE_PREFIX` dan `IMAGE_TAG` pada `.env`, lalu
+2. **Jalankan Docker Compose:**
+   - **Menggunakan Image Hasil Build CI/CD dari Docker Hub (Tanpa Build Ulang):**
+     Pastikan `IMAGE_PREFIX` dan `IMAGE_TAG` sudah terkonfigurasi di `.env`, lalu jalankan:
      ```bash
      docker compose up -d --pull always --no-build --wait
      ```
-   - **Build sendiri dari source code** (sekitar 15 menit pertama kali):
+   - **Build Sendiri dari Source Code Lokal:**
      ```bash
      docker compose up -d --build --wait
      ```
 
-3. Frontend terbuka di <http://localhost:4000> dan backend di <http://localhost:9000/api/health>. Database tidak dibuka ke luar,
-   dan tabelnya dibuat otomatis oleh backend saat container menyala (`prisma db push`).
+3. **Akses Aplikasi:**
+   - Frontend terbuka di <http://localhost:4000>
+   - Backend API Health check di <http://localhost:9000/api/health>
+   - Database PostgreSQL berjalan di jaringan internal container (tabel dan skema dibuat otomatis via `prisma db push` saat backend container *booting*).
 
-### B. Tanpa Docker (mode development)
+---
 
-1. Jalankan database:
+### B. Menjalankan Tanpa Docker (Local Development Mode)
+
+Jika Anda ingin melakukan pengembangan/fitur baru secara langsung tanpa container:
+
+1. **Jalankan Database PostgreSQL (misal via Docker terpisah):**
    ```bash
    docker run --name fer-postgres -e POSTGRES_USER=fer -e POSTGRES_PASSWORD=rahasia -e POSTGRES_DB=fer_db -p 5434:5432 -d postgres:15-alpine
    ```
-2. Backend: salin `backend/.env.example` menjadi `backend/.env`, lalu di folder `backend` jalankan `bun install`, `bun run db:generate`,
-   `bun run db:push`, dan `bun run dev` (port 8000). `bun run dev` otomatis membuat `venv` dan memasang `requirements.txt`.
-3. Frontend: salin `frontend/.env.example` menjadi `frontend/.env`, lalu di folder `frontend` jalankan `bun install` dan `bun run dev` (port 3000).
 
-### Menjalankan test
+2. **Jalankan Service Backend:**
+   Salin `backend/.env.example` menjadi `backend/.env` (sesuaikan port ke `8000`), lalu jalankan perintah berikut di folder `backend`:
+   ```bash
+   cd backend
+   bun install
+   bun run db:generate
+   bun run db:push
+   bun run dev
+   ```
+   `bun run dev` secara otomatis membuat lingkungan virtual Python (`venv`) dan memasang pustaka dari `requirements.txt`.
 
-```bash
-cd backend && bun run test
-```
-
-```bash
-cd backend && pip install -r requirements-dev.txt && python -m pytest -q tests
-```
-
-Test Python memuat bobot model asli dan memastikan urutan label, deteksi wajah, serta ketiga pilihan model berjalan benar.
-
----
-
-## Alur CI/CD
-
-Workflow ada di `.github/workflows/ci-cd.yml` dan berjalan setiap ada push ke `main` (atau lewat tombol **Run workflow**):
-
-1. **Test:** `test-backend` (typecheck dan vitest), `test-ml` (pytest dengan bobot model asli), dan `test-frontend` (build Next.js).
-2. **Build dan push:** image backend dan frontend di-build di VM GitHub lalu dikirim ke Docker Hub sebagai
-   `<username>/moodlens-backend` dan `<username>/moodlens-frontend`, dengan tag commit SHA dan `latest`.
-3. **Deploy:** self-hosted runner di laptop kelompok menarik image terbaru dari Docker Hub, menjalankan `docker compose up`,
-   lalu smoke test ke `/api/health` dan halaman frontend.
-
-Syarat di GitHub (**Settings > Secrets and variables > Actions**): variable `DOCKERHUB_USERNAME`, serta secret `DOCKERHUB_TOKEN`,
-`POSTGRES_PASSWORD`, dan `JWT_SECRET` (`AUTH_SECRET` opsional). Runner dijalankan dengan `run.cmd` di laptop yang menjadi server.
+3. **Jalankan Service Frontend:**
+   Salin `frontend/.env.example` menjadi `frontend/.env` (sesuaikan port backend ke `8000`), lalu jalankan perintah berikut di folder `frontend`:
+   ```bash
+   cd frontend
+   bun install
+   bun run dev
+   ```
+   Aplikasi Next.js akan terbuka di port `3000`.
 
 ---
 
-## Notebook
+### Menjalankan Pengujian (Testing)
 
-- `notebook/UTS_Modip.ipynb`: eksplorasi data, training, dan evaluasi kedua model. Menghasilkan bobot `.weights.h5` yang dipakai aplikasi.
-- `notebook/Pembahasan_Modip.ipynb`: pembuktian ensemble, ambang keyakinan $\tau = 0,5$, dan eksperimen _selective fine-tuning_ ResNet50.
+- **Backend Integration & Unit Test:**
+  ```bash
+  cd backend && bun run test
+  ```
 
-Bobot di `backend/src/services/model/` adalah hasil notebook tersebut, dengan state optimizer dibuang agar ukurannya di bawah batas 100 MB GitHub.
+- **Machine Learning Inference Test:**
+  ```bash
+  cd backend && pip install -r requirements-dev.txt && python -m pytest -q tests
+  ```
+  *Pengujian Python memuat bobot model asli untuk menguji urutan label emosi, deteksi landmark wajah, serta validitas 3 pilihan inferensi model.*
+
+---
+
+## Alur Pipeline CI/CD
+
+Workflow CI/CD diatur pada berkas `.github/workflows/ci-cd.yml` yang ter-trigger otomatis saat terdapat perintah *push* ke branch `main` atau dijalankan secara manual via **Run workflow**:
+
+1. **Test Phase:** 
+   - `test-backend`: Typechecking dan pengujian skrip Vitest.
+   - `test-ml`: Pytest dengan memuat file bobot model asli (`.weights.h5`).
+   - `test-frontend`: Verifikasi *build production* Next.js.
+2. **Build & Push Phase:** 
+   - Mengompilasi Docker image backend & frontend di runner GitHub.
+   - Mengunggah image ke Docker Hub (`<username>/moodlens-backend` & `<username>/moodlens-frontend`) menggunakan tag `latest` dan commit SHA.
+3. **Deploy Phase:** 
+   - *Self-hosted runner* mengeksekusi penarikan image terbaru dari Docker Hub.
+   - Menyiapkan environment `.env.deploy` dan mengaktifkan container melalui `docker compose up -d`.
+   - Melakukan *smoke test* ke endpoint `/api/health` serta halaman antarmuka frontend.
+
+**Konfigurasi Repository Secret (GitHub Actions Settings > Secrets and variables):**
+- Variables: `DOCKERHUB_USERNAME`
+- Secrets: `DOCKERHUB_TOKEN`, `POSTGRES_PASSWORD`, `JWT_SECRET` (`AUTH_SECRET` opsional).
+
+---
+
+## Struktur Notebook Model
+
+- `notebook/UTS_Modip.ipynb`: Eksplorasi dataset FER-2013, pelatihan model, serta evaluasi metrik Custom Residual CNN & ResNet50. Menghasilkan berkas bobot `.weights.h5` yang digunakan di backend.
+- `notebook/Pembahasan_Modip.ipynb`: Eksperimen pembuktian *Soft Voting Ensemble*, ambang batas keyakinan $\tau = 0,5$, serta analisis *selective fine-tuning* ResNet50.
+
+> File bobot model tersimpan pada folder `backend/src/services/model/` (state optimizer telah dibersihkan agar berada di bawah ambang batas ukuran berkas GitHub 100 MB).
