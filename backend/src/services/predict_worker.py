@@ -23,44 +23,50 @@ MAX_FACES = 10
 YUNET_SCORE_THRESHOLD = 0.7
 YUNET_NMS_THRESHOLD = 0.3
 MODEL_SPECS = {
-    "vanilla": "best_vanilla_fer_model.weights.h5",
-    "resnet50": "best_resnet_fer.weights.h5",
+    "vanilla": "best_vanilla_modified_fer_model.weights.h5",
+    "resnet50": "best_resnet_modified_fer.weights.h5",
 }
 
 
 class ResidualBlock(layers.Layer):
     def __init__(self, filters, stride=1, **kwargs):
-        super().__init__(**kwargs)
-        self.conv1 = layers.Conv2D(filters, (3, 3), strides=stride, padding="same", activation="relu")
+        super(ResidualBlock, self).__init__(**kwargs)
+        self.filters = filters
+        self.stride = stride
+        self.conv1 = layers.Conv2D(filters, (3, 3), strides=stride, padding="same", use_bias=False)
         self.bn1 = layers.BatchNormalization()
-        self.conv2 = layers.Conv2D(filters, (3, 3), padding="same")
+        self.conv2 = layers.Conv2D(filters, (3, 3), strides=1, padding="same", use_bias=False)
         self.bn2 = layers.BatchNormalization()
-        self.shortcut = (
-            tf.keras.Sequential(
-                [
-                    layers.Conv2D(filters, (1, 1), strides=stride, padding="same"),
-                    layers.BatchNormalization(),
-                ]
-            )
-            if stride != 1
-            else lambda x, training=False: x
-        )
+        if stride != 1:
+            self.shortcut = tf.keras.Sequential([
+                layers.Conv2D(filters, (1, 1), strides=stride, padding="same", use_bias=False),
+                layers.BatchNormalization()
+            ])
+        else:
+            self.shortcut = lambda x, training=False: x
 
     def call(self, inputs, training=False):
         shortcut = self.shortcut(inputs, training=training)
         x = self.conv1(inputs)
         x = self.bn1(x, training=training)
+        x = tf.nn.relu(x)
         x = self.conv2(x)
         x = self.bn2(x, training=training)
-        return tf.nn.relu(layers.add([x, shortcut]))
+        x = layers.add([x, shortcut])
+        return tf.nn.relu(x)
+
+    def get_config(self):
+        config = super(ResidualBlock, self).get_config()
+        config.update({"filters": self.filters, "stride": self.stride})
+        return config
 
 
 class AdvancedResidualFERModel(Model):
     def __init__(self, num_classes=7, **kwargs):
-        super().__init__(**kwargs)
+        super(AdvancedResidualFERModel, self).__init__(**kwargs)
         self.init_conv = layers.Conv2D(64, (3, 3), padding="same", activation="relu")
         self.init_bn = layers.BatchNormalization()
-        self.res_block1 = ResidualBlock(64)
+        self.res_block1 = ResidualBlock(64, stride=1)
         self.pool1 = layers.MaxPooling2D(2, 2)
         self.drop1 = layers.Dropout(0.3)
         self.res_block2 = ResidualBlock(128, stride=2)
@@ -92,7 +98,7 @@ class AdvancedResidualFERModel(Model):
 
 class OOPResNet50FERModel(Model):
     def __init__(self, num_classes=7, **kwargs):
-        super().__init__(**kwargs)
+        super(OOPResNet50FERModel, self).__init__(**kwargs)
         self.base_model = ResNet50(
             input_shape=(NEW_IMG_SIZE, NEW_IMG_SIZE, 3),
             include_top=False,
@@ -140,7 +146,6 @@ def build_models():
 
 
 def build_face_detector():
-    # YuNet model from the pinned OpenCV Zoo revision; its MIT license is next to the model.
     model_path = Path(__file__).resolve().parent / "model" / "face_detection_yunet_2023mar.onnx"
     if not model_path.is_file():
         raise RuntimeError(f"YuNet face detector model tidak ditemukan: {model_path}")
@@ -293,18 +298,10 @@ def process_image(data, model_name, models, face_detectors):
 
     if crops:
         batch = tf.convert_to_tensor(np.stack(crops)[..., None], dtype=tf.float32)
-        selected_models = ["vanilla", "resnet50"] if model_name == "ensemble" else [model_name]
-        predictions = {
-            name: models[name](batch).numpy()
-            for name in selected_models
-        }
+        predictions = models[model_name](batch).numpy()
 
         for index, face in enumerate(faces):
-            scores = (
-                (predictions["vanilla"][index] + predictions["resnet50"][index]) / 2.0
-                if model_name == "ensemble"
-                else predictions[model_name][index]
-            )
+            scores = predictions[index]
             probabilities = [float(score) for score in scores]
             best_index = int(np.argmax(scores))
             face.update(
@@ -334,8 +331,8 @@ def main():
         try:
             request = json.loads(line)
             model_name = request.get("model", "resnet50")
-            if model_name not in MODEL_SPECS and model_name != "ensemble":
-                raise ValueError("Model harus vanilla, resnet50, atau ensemble")
+            if model_name not in MODEL_SPECS:
+                raise ValueError("Model harus vanilla atau resnet50")
             result = process_image(request["image"], model_name, models, face_detectors)
             print(json.dumps(result), flush=True)
         except Exception as exc:
