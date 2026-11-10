@@ -59,7 +59,9 @@ interface StatsApiResponse {
 }
 
 export default function TrackPage() {
-  const { data: session } = useSession();
+  // Pakai status login (string), bukan objek session: objek session dibuat ulang di setiap request.
+  const { status } = useSession();
+  const isLoggedIn = status === "authenticated";
 
   const [statsDays, setStatsDays] = useState<number>(14);
   const [statsData, setStatsData] = useState<StatsApiResponse | null>(null);
@@ -74,7 +76,7 @@ export default function TrackPage() {
   // Load Statistik
   const loadStats = async (days = statsDays) => {
     setStatsLoading(true);
-    if (session) {
+    if (isLoggedIn) {
       try {
         const res = (await fetchStats(days)) as StatsApiResponse;
         setStatsData(res);
@@ -145,7 +147,7 @@ export default function TrackPage() {
   // Load Riwayat
   const loadHistory = async (offset = historyOffset, limit = historyLimit) => {
     setHistoryLoading(true);
-    if (session) {
+    if (isLoggedIn) {
       try {
         const res = (await fetchHistory(offset, limit)) as HistoryApiResponse;
         const formatted: HistoryRecord[] = (res.items || []).map((p) => ({
@@ -170,11 +172,12 @@ export default function TrackPage() {
     setHistoryLoading(false);
   };
 
-  // HANYA dipanggil sekali saat halaman pertama kali dibuka (mount)
+  // Dimuat sekali setelah status login diketahui, agar data Guest tidak tampil untuk user yang login.
   useEffect(() => {
+    if (status === "loading") return;
     loadStats();
     loadHistory();
-  }, []);
+  }, [status]);
 
   const handleRefreshAll = () => {
     loadStats();
@@ -184,7 +187,7 @@ export default function TrackPage() {
 
   const handleDeleteItem = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus riwayat ini?")) return;
-    if (session) {
+    if (isLoggedIn) {
       try {
         await deleteHistoryItem(parseInt(id, 10));
         showToast.success("Riwayat berhasil dihapus");
@@ -210,7 +213,7 @@ export default function TrackPage() {
       )
     )
       return;
-    if (session) {
+    if (isLoggedIn) {
       try {
         await clearAllHistory();
         showToast.success("Semua riwayat berhasil dibersihkan");

@@ -98,7 +98,10 @@ function FaceBoxOverlay({
 }
 
 function PredictionContent() {
-  const { data: session } = useSession();
+  // Pakai status login, bukan objek session: objek session dibuat ulang di setiap request,
+  // sehingga loop webcam akan ter-reset dan mengirim request tanpa jeda.
+  const { status } = useSession();
+  const isLoggedIn = status === "authenticated";
   const searchParams = useSearchParams();
 
   const initialMode = searchParams.get("mode");
@@ -115,7 +118,7 @@ function PredictionContent() {
 
   const [selectedModel, setSelectedModel] = useState<
     "ensemble" | "vanilla" | "resnet50"
-  >("vanilla");
+  >("ensemble");
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -259,7 +262,7 @@ function PredictionContent() {
       if (!isLooping) setIsAnalyzing(true);
 
       try {
-        const saveHistory = Boolean(session && !isLooping);
+        const saveHistory = Boolean(isLoggedIn && !isLooping);
         const result = await predictImage(
           fileToUpload,
           source,
@@ -268,7 +271,7 @@ function PredictionContent() {
         );
         setPrediction(result);
 
-        if (!session && !isLooping && result.n_faces > 0) {
+        if (!isLoggedIn && !isLooping && result.n_faces > 0) {
           const mainFace = result.faces[0];
           if (mainFace && previewUrl) {
             guestStorage.addHistory({
@@ -297,7 +300,7 @@ function PredictionContent() {
       previewUrl,
       selectedFile,
       selectedModel,
-      session,
+      isLoggedIn,
       stopCamera,
     ],
   );
@@ -411,6 +414,16 @@ function PredictionContent() {
             Model:
           </span>
           <button
+            onClick={() => setSelectedModel("ensemble")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              selectedModel === "ensemble"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Ensemble (63%)
+          </button>
+          <button
             onClick={() => setSelectedModel("resnet50")}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               selectedModel === "resnet50"
@@ -418,7 +431,7 @@ function PredictionContent() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            ResNet50 (61%)
+            ResNet50 (62%)
           </button>
           <button
             onClick={() => setSelectedModel("vanilla")}
@@ -428,7 +441,7 @@ function PredictionContent() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Vanilla CNN (56%)
+            Vanilla CNN (51%)
           </button>
         </div>
       </div>
@@ -887,7 +900,7 @@ function PredictionContent() {
               )}
 
               <div className="pt-2">
-                {session ? (
+                {isLoggedIn ? (
                   <div className="rounded-xl border border-success/30 bg-success/10 p-3 flex items-start gap-2.5">
                     <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
                     <p className="text-[11px] text-success font-medium leading-relaxed">

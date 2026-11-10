@@ -1,51 +1,87 @@
 name: moodlens
 
+# Semua variabel dibaca dari file .env di folder yang sama dengan file ini (salin dari .env.example).
+# backend/.env dan frontend/.env TIDAK dibaca di sini; keduanya khusus `bun run dev`.
+# Saat deploy lewat CI/CD, nilai rahasia diisi dari GitHub Secrets.
+
 services:
   # 1. Container PostgreSQL Database
   database:
     image: postgres:15-alpine
-    container_name: moodlens-db
     restart: always
-    env_file:
-      - ./backend/.env.deploy
-    ports:
-      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib diisi di .env}
+      POSTGRES_DB: ${POSTGRES_DB:-fer_db}
+    # Tidak ada "ports": database hanya bisa diakses backend lewat network Docker, tidak dari luar.
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks:
       - fer_network
 
   # 2. Container Backend Express.js + Python ML
   backend:
+    image: ${IMAGE_PREFIX:-moodlens}-backend:${IMAGE_TAG:-local}
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: moodlens-backend
     restart: always
-    env_file:
-      - ./backend/.env.deploy
+    environment:
+      PORT: 9000
+      # POSTGRES_PASSWORD_URL diisi pipeline deploy dengan password yang sudah di-encode untuk URL,
+      # agar password yang berisi karakter seperti @ atau : tetap bisa dipakai.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fer}:${POSTGRES_PASSWORD_URL:-${POSTGRES_PASSWORD}}@database:5432/${POSTGRES_DB:-fer_db}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET wajib diisi di .env}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-480}
+      APP_VERSION: ${IMAGE_TAG:-local}
     ports:
       - "9000:9000"
     depends_on:
-      - database
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/api/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # Memuat TensorFlow dan kedua model butuh waktu saat container baru menyala.
+      start_period: 180s
     networks:
       - fer_network
 
   # 3. Container Frontend Next.js
   frontend:
+    image: ${IMAGE_PREFIX:-moodlens}-frontend:${IMAGE_TAG:-local}
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:9000/api
-    container_name: moodlens-frontend
+        # Dipakai browser untuk memanggil backend, ditanam ke JavaScript saat build.
+        NEXT_PUBLIC_API_URL: http://localhost:9000/api
     restart: always
-    env_file:
-      - ./frontend/.env.deploy
+    environment:
+      PORT: 4000
+      # Dipakai server Next.js (login NextAuth) untuk memanggil backend lewat network Docker.
+      INTERNAL_API_URL: http://backend:9000/api
+      NEXTAUTH_URL: http://localhost:4000
+      AUTH_URL: http://localhost:4000/api/auth
+      AUTH_TRUST_HOST: "true"
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET wajib diisi di .env}
     ports:
       - "4000:4000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:4000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - fer_network
 

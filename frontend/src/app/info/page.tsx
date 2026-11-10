@@ -41,8 +41,8 @@ export default function InfoPage() {
             </p>
             <p>
               <strong className="text-foreground">Akurasi Eksperimen:</strong>{" "}
-              Mencapai akurasi pengujian <strong>57.0%</strong> (Macro F1:
-              0.51), melampaui performa ResNet50 versi beku meskipun memiliki
+              Mencapai akurasi pengujian <strong>51.3%</strong> (Macro F1:
+              0.44), melampaui performa ResNet50 versi beku meskipun memiliki
               parameter yang jauh lebih sedikit.
             </p>
           </div>
@@ -50,7 +50,7 @@ export default function InfoPage() {
             <span className="text-xs text-muted-foreground">
               Akurasi Pengujian (Test Set)
             </span>
-            <span className="text-2xl font-black text-foreground">57%</span>
+            <span className="text-2xl font-black text-foreground">51%</span>
           </div>
         </div>
 
@@ -84,8 +84,8 @@ export default function InfoPage() {
             </p>
             <p>
               <strong className="text-foreground">Akurasi Eksperimen:</strong>{" "}
-              Meningkat drastis dari versi beku (47%) menjadi{" "}
-              <strong>61.0%</strong> (Macro F1: 0.57) setelah fine-tuning,
+              Meningkat drastis dari versi beku (46.7%) menjadi{" "}
+              <strong>61.7%</strong> (Macro F1: 0.60) setelah fine-tuning,
               menjadikannya model individu terbaik.
             </p>
           </div>
@@ -94,7 +94,7 @@ export default function InfoPage() {
               Akurasi Pengujian (Test Set)
             </span>
             <span className="text-2xl font-black text-gradient-brand">
-              61% (+13%)
+              62% (+15%)
             </span>
           </div>
         </div>
@@ -128,8 +128,8 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-success">
                   1. Happy (Senang)
                 </td>
-                <td className="py-3 px-4">81% / 81% / 81%</td>
-                <td className="py-3 px-4">84% / 77% / 80%</td>
+                <td className="py-3 px-4">83% / 71% / 76%</td>
+                <td className="py-3 px-4">85% / 78% / 81%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Performa tertinggi. Struktur senyuman lebar, pipi terangkat,
                   dan kerutan sudut mata sangat dominan dan mudah dikenali.
@@ -141,8 +141,8 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-accent-2">
                   2. Surprise (Terkejut)
                 </td>
-                <td className="py-3 px-4">63% / 82% / 71%</td>
-                <td className="py-3 px-4">67% / 80% / 73%</td>
+                <td className="py-3 px-4">58% / 80% / 67%</td>
+                <td className="py-3 px-4">70% / 81% / 75%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Sangat baik dengan recall tinggi (~80%). Bentuk geometri mata
                   melotot dan mulut terbuka berbentuk huruf O sangat khas.
@@ -154,8 +154,8 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-foreground">
                   3. Neutral (Datar)
                 </td>
-                <td className="py-3 px-4">45% / 73% / 56%</td>
-                <td className="py-3 px-4">51% / 67% / 58%</td>
+                <td className="py-3 px-4">44% / 65% / 52%</td>
+                <td className="py-3 px-4">52% / 69% / 59%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Sensitif mendeteksi wajah netral (recall tinggi), namun
                   presisi rendah karena sering tumpang tindih dengan wajah datar
@@ -168,8 +168,8 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-destructive">
                   4. Angry (Marah)
                 </td>
-                <td className="py-3 px-4">56% / 37% / 45%</td>
-                <td className="py-3 px-4">49% / 56% / 52%</td>
+                <td className="py-3 px-4">46% / 28% / 35%</td>
+                <td className="py-3 px-4">48% / 57% / 52%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Tantangan menengah. ResNet50 menunjukkan peningkatan recall
                   luar biasa karena berhasil mengekstrak fitur kerutan alis
@@ -182,8 +182,8 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-warning">
                   5. Disgust (Jijik)
                 </td>
-                <td className="py-3 px-4">24% / 61% / 34%</td>
-                <td className="py-3 px-4">40% / 74% / 52%</td>
+                <td className="py-3 px-4">13% / 68% / 21%</td>
+                <td className="py-3 px-4">53% / 65% / 58%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Masalah imbalance (hanya 111 sampel). Penggunaan class weights
                   berhasil memaksa sensitivitas tinggi, mendongkrak performa
@@ -196,8 +196,8 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold font-semibold text-sky-400">
                   6. Sad (Sedih)
                 </td>
-                <td className="py-3 px-4">-- / -- / --</td>
-                <td className="py-3 px-4">-- / -- / --</td>
+                <td className="py-3 px-4">42% / 42% / 42%</td>
+                <td className="py-3 px-4">54% / 41% / 47%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Tantangan kasus tersulit. Cenderung salah diklasifikasikan
                   sebagai Netral atau Takut akibat kemiripan mikro-ekspresi
@@ -210,12 +210,12 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-rose-400">
                   7. Fear (Takut)
                 </td>
-                <td className="py-3 px-4">-- / 17% / --</td>
-                <td className="py-3 px-4">-- / 34% / --</td>
+                <td className="py-3 px-4">35% / 9% / 14%</td>
+                <td className="py-3 px-4">53% / 40% / 45%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Emosi paling kompleks. Menggabungkan elemen terkejut dan
-                  sedih. ResNet50 sukses mendongkrak recall dari 17% menjadi
-                  34%–40%.
+                  sedih. ResNet50 sukses mendongkrak recall dari 9% menjadi
+                  40%.
                 </td>
               </tr>
             </tbody>
