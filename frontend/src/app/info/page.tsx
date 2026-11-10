@@ -27,30 +27,26 @@ export default function InfoPage() {
           </div>
           <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
             <p>
-              <strong className="text-foreground">Konsep Desain:</strong>{" "}
-              Dirancang khusus dari nol (from scratch) dengan mengadopsi prinsip
-              ResNet (Residual Network) untuk mengatasi masalah vanishing
-              gradient menggunakan Residual Blocks.
+              <strong className="text-foreground">Input:</strong> Citra
+              Grayscale 48x48 piksel.
             </p>
             <p>
-              <strong className="text-foreground">Cara Kerja & Fitur:</strong>{" "}
-              Menggunakan skip connection ($y = f(x) + x$) dan projection
-              shortcut $1 \times 1$ untuk penyesuaian dimensi. Sangat efisien
-              dengan ~1.3 juta parameter, ukuran bobot kecil, serta komputasi
-              cepat.
+              <strong className="text-foreground">Fitur Utama:</strong>{" "}
+              Menggunakan koneksi residual (skip connection) sederhana dengan
+              filter konvolusi 3x3 (64, 128, 256 channel), Global Average
+              Pooling, dan Dense Layer 256 unit.
             </p>
             <p>
-              <strong className="text-foreground">Akurasi Eksperimen:</strong>{" "}
-              Mencapai akurasi pengujian <strong>57.0%</strong> (Macro F1:
-              0.51), melampaui performa ResNet50 versi beku meskipun memiliki
-              parameter yang jauh lebih sedikit.
+              <strong className="text-foreground">Karakteristik:</strong>{" "}
+              Ekstraksi pola lokal dasar (tepi, lipatan mulut) yang sangat
+              ringan, efisien, dan cocok untuk inferensi cepat.
             </p>
           </div>
           <div className="pt-2 border-t border-border/50 flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
               Akurasi Pengujian (Test Set)
             </span>
-            <span className="text-2xl font-black text-foreground">57%</span>
+            <span className="text-2xl font-black text-foreground">56%</span>
           </div>
         </div>
 
@@ -67,26 +63,18 @@ export default function InfoPage() {
           </div>
           <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
             <p>
-              <strong className="text-foreground">
-                Pipeline GPU Internal:
-              </strong>{" "}
-              Otomatis mengonversi input grayscale ($48 \times 48 \times 1$)
-              menjadi RGB ($48 \times 48 \times 3$), melakukan resizing ke $96
-              \times 96$ piksel, dan normalisasi langsung di GPU.
+              <strong className="text-foreground">Input:</strong> Resizing
+              internal ke 96x96 piksel dengan 3 channel RGB.
             </p>
             <p>
-              <strong className="text-foreground">
-                Selective Fine-Tuning:
-              </strong>{" "}
-              Layer awal dibekukan karena sudah mahir mendeteksi fitur dasar.
-              Hanya 30 layer teratas (top-30) yang dibuka untuk dilatih ulang
-              agar sensitif terhadap mikro-ekspresi wajah.
+              <strong className="text-foreground">Fitur Utama:</strong>{" "}
+              Fine-tuning pada 30 layer teratas memanfaatkan bobot pra-latih
+              ImageNet untuk mengenali struktur anatomi wajah yang rumit.
             </p>
             <p>
-              <strong className="text-foreground">Akurasi Eksperimen:</strong>{" "}
-              Meningkat drastis dari versi beku (47%) menjadi{" "}
-              <strong>61.0%</strong> (Macro F1: 0.57) setelah fine-tuning,
-              menjadikannya model individu terbaik.
+              <strong className="text-foreground">Karakteristik:</strong>{" "}
+              Ekstraksi fitur visual tingkat tinggi yang mendalam untuk akurasi
+              optimal.
             </p>
           </div>
           <div className="pt-2 border-t border-border/50 flex items-center justify-between">
@@ -94,7 +82,7 @@ export default function InfoPage() {
               Akurasi Pengujian (Test Set)
             </span>
             <span className="text-2xl font-black text-gradient-brand">
-              61% (+13%)
+              61% (+5%)
             </span>
           </div>
         </div>
@@ -128,11 +116,12 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-success">
                   1. Happy (Senang)
                 </td>
-                <td className="py-3 px-4">81% / 81% / 81%</td>
-                <td className="py-3 px-4">84% / 77% / 80%</td>
+                <td className="py-3 px-4">87% / 77% / 82%</td>
+                <td className="py-3 px-4">85% / 78% / 81%</td>
                 <td className="py-3 px-4 text-muted-foreground">
                   Performa tertinggi. Struktur senyuman lebar, pipi terangkat,
-                  dan kerutan sudut mata sangat dominan dan mudah dikenali.
+                  dan kerutan sudut mata sangat dominan dan mudah dikenali
+                  filter konvolusi.
                 </td>
               </tr>
 
@@ -141,11 +130,11 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-accent-2">
                   2. Surprise (Terkejut)
                 </td>
-                <td className="py-3 px-4">63% / 82% / 71%</td>
-                <td className="py-3 px-4">67% / 80% / 73%</td>
+                <td className="py-3 px-4">66% / 79% / 72%</td>
+                <td className="py-3 px-4">69% / 80% / 74%</td>
                 <td className="py-3 px-4 text-muted-foreground">
-                  Sangat baik dengan recall tinggi (~80%). Bentuk geometri mata
-                  melotot dan mulut terbuka berbentuk huruf O sangat khas.
+                  Sangat akurat dengan recall 80%. Bentuk geometri mata melotot
+                  dan mulut terbuka membulat (berbentuk huruf O) sangat khas.
                 </td>
               </tr>
 
@@ -154,12 +143,12 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-foreground">
                   3. Neutral (Datar)
                 </td>
-                <td className="py-3 px-4">45% / 73% / 56%</td>
-                <td className="py-3 px-4">51% / 67% / 58%</td>
+                <td className="py-3 px-4">47% / 70% / 56%</td>
+                <td className="py-3 px-4">54% / 65% / 59%</td>
                 <td className="py-3 px-4 text-muted-foreground">
-                  Sensitif mendeteksi wajah netral (recall tinggi), namun
-                  presisi rendah karena sering tumpang tindih dengan wajah datar
-                  saat sedih atau marah.
+                  Performa cukup konsisten. Minim tarikan otot ekstrem, namun
+                  terkadang tumpang tindih dengan ekspresi Sedih atau Marah pada
+                  wajah resting face.
                 </td>
               </tr>
 
@@ -168,12 +157,12 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-destructive">
                   4. Angry (Marah)
                 </td>
-                <td className="py-3 px-4">56% / 37% / 45%</td>
-                <td className="py-3 px-4">49% / 56% / 52%</td>
+                <td className="py-3 px-4">42% / 51% / 46%</td>
+                <td className="py-3 px-4">50% / 57% / 53%</td>
                 <td className="py-3 px-4 text-muted-foreground">
-                  Tantangan menengah. ResNet50 menunjukkan peningkatan recall
-                  luar biasa karena berhasil mengekstrak fitur kerutan alis
-                  tajam dengan baik.
+                  Performa moderat. Berfokus pada kerutan alis ke bawah, tetapi
+                  sering tertukar dengan Sedih atau Netral karena intensitas
+                  kerutan bervariasi.
                 </td>
               </tr>
 
@@ -182,12 +171,12 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-warning">
                   5. Disgust (Jijik)
                 </td>
-                <td className="py-3 px-4">24% / 61% / 34%</td>
-                <td className="py-3 px-4">40% / 74% / 52%</td>
+                <td className="py-3 px-4">19% / 69% / 30%</td>
+                <td className="py-3 px-4">45% / 68% / 54%</td>
                 <td className="py-3 px-4 text-muted-foreground">
-                  Masalah imbalance (hanya 111 sampel). Penggunaan class weights
-                  berhasil memaksa sensitivitas tinggi, mendongkrak performa
-                  ResNet50 secara signifikan.
+                  Sampel paling sedikit (111 sampel). Penggunaan class weight
+                  berhasil mendongkrak presisi ResNet50 hingga 45% tanpa
+                  mengorbankan sensitivitas.
                 </td>
               </tr>
 
@@ -196,12 +185,12 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold font-semibold text-sky-400">
                   6. Sad (Sedih)
                 </td>
-                <td className="py-3 px-4">-- / -- / --</td>
-                <td className="py-3 px-4">-- / -- / --</td>
+                <td className="py-3 px-4">44% / 31% / 36%</td>
+                <td className="py-3 px-4">53% / 43% / 48%</td>
                 <td className="py-3 px-4 text-muted-foreground">
-                  Tantangan kasus tersulit. Cenderung salah diklasifikasikan
-                  sebagai Netral atau Takut akibat kemiripan mikro-ekspresi
-                  mulut dan mata sayu.
+                  Tantangan kasus sulit. Cenderung salah diklasifikasikan
+                  sebagai Netral (277 gambar) atau Takut (140 gambar) akibat
+                  kemiripan mikro ekspresi mulut.
                 </td>
               </tr>
 
@@ -210,12 +199,12 @@ export default function InfoPage() {
                 <td className="py-3 px-4 font-bold text-rose-400">
                   7. Fear (Takut)
                 </td>
-                <td className="py-3 px-4">-- / 17% / --</td>
-                <td className="py-3 px-4">-- / 34% / --</td>
+                <td className="py-3 px-4">41% / 21% / 28%</td>
+                <td className="py-3 px-4">51% / 40% / 45%</td>
                 <td className="py-3 px-4 text-muted-foreground">
-                  Emosi paling kompleks. Menggabungkan elemen terkejut dan
-                  sedih. ResNet50 sukses mendongkrak recall dari 17% menjadi
-                  34%–40%.
+                  Emosi paling kompleks. Memuat elemen mata membesar (mirip
+                  Terkejut) dan mulut mengerut (mirip Sedih), namun ResNet50
+                  sukses mendongkrak recall dari 21% ke 40%.
                 </td>
               </tr>
             </tbody>

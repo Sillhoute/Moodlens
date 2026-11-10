@@ -31,18 +31,18 @@ Sistem berjalan secara terisolasi ke dalam 3 container Docker yang terhubung mel
 Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang dilatih menggunakan dataset **FER-2013**:
 
 1. **Custom Residual CNN (Vanilla):** Arsitektur konvolusi buatan sendiri dengan _skip connections_ (residual block) yang efisien untuk mengekstraksi fitur pola spasial dasar pada citra grayscale $48 \times 48$ piksel.
-2. **Pre-trained ResNet50 (Transfer Learning):** Menggunakan bobot pra-latih _ImageNet_ dengan pipeline GPU internal (grayscale*to_rgb, resizing ke $96 \times 96$) serta teknik \_fine-tuning* pada 30 layer teratas.
+2. **Pre-trained ResNet50 (Transfer Learning):** Menggunakan bobot pra-latih _ImageNet_ yang di-fine-tune untuk menangkap struktur anatomi wajah yang lebih kompleks dan mendalam.
 
 ### Penggunaan Ambang Batas Keyakinan ($\tau$)
 
-- **Ambangk Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru.
+- **Ambang Batas Keyakinan ($\tau = 0,5$):** Jika probabilitas kelas emosi tertinggi berada di bawah ambang batas $\tau = 0,5$, sistem secara cerdas mengklasifikasikannya sebagai **"Ekspresi kurang jelas"** guna menghindari prediksi yang keliru.
 
 ### Metrik Performa Evaluasi Model
 
 | Model / Arsitektur   | Akurasi Pengujian | Macro F1-Score | Keterangan                                         |
 | -------------------- | ----------------- | -------------- | -------------------------------------------------- |
-| Custom Residual CNN  | 57,0%             | 0,51           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
-| Pre-trained ResNet50 | 61,0%             | 0,57           | Unggul dalam ekstraksi pola visual kompleks        |
+| Custom Residual CNN  | 56,0%             | 0,51           | Cepat & ringan untuk ekstraksi fitur spasial dasar |
+| Pre-trained ResNet50 | 61,0%             | 0,59           | Unggul dalam ekstraksi pola visual kompleks (+5%)  |
 
 ---
 
@@ -51,26 +51,26 @@ Sistem ini menggunakan dua pilihan arsitektur model Deep Learning terpisah yang 
 Berdasarkan hasil pengujian pada 7.178 gambar uji (mengacu pada _Classification Report_ dan _Confusion Matrix_), berikut adalah karakteristik dan performa pengenalan untuk masing-masing dari 7 kelas emosi:
 
 1. **Happy (Senang):**
-   - **Performa:** Merupakan kelas dengan akurasi dan stabilitas tertinggi (Precision ~84-85%, Recall ~77-81%).
-   - **Karakteristik Visual:** Struktur senyuman lebar, pipi terangkat, serta kerutan di sudut mata sangat dominan dan mudah dikenali.
+   - **Performa:** Merupakan kelas dengan akurasi dan stabilitas tertinggi (Precision ~85-87%, Recall ~77-78%).
+   - **Karakteristik Visual:** Struktur senyuman lebar, pipi terangkat, serta kerutan di sudut mata sangat dominan dan mudah dikenali oleh filter konvolusi.
 2. **Surprise (Terkejut):**
-   - **Performa:** Sangat akurat dengan tingkat _recall_ mencapai 80%.
-   - **Karakteristik Visual:** Bentuk geometri mata melotot dan mulut terbuka membulat (berbentuk huruf O) memberikan fitur pembeda yang sangat kuat.
+   - **Performa:** Sangat akurat dengan tingkat _recall_ mencapai 79–80%.
+   - **Karakteristik Visual:** Bentuk geometri mata melotot dan mulut terbuka membulat (berbentuk huruf O) memberikan fitur pembeda yang sangat khas.
 3. **Neutral (Datar):**
-   - **Performa:** Cukup konsisten dengan tingkat identifikasi sensitif (recall tinggi).
-   - **Karakteristik Visual:** Minim tarikan otot ekstrem, namun sering kali mengalami tumpang tindih (_overlap_) dengan ekspresi sedih atau marah.
+   - **Performa:** Cukup konsisten dengan tingkat identifikasi yang stabil.
+   - **Karakteristik Visual:** Minim tarikan otot ekstrem. Namun, sering kali mengalami tumpang tindih (_overlap_) dengan ekspresi _Sad_ atau _Angry_.
 4. **Angry (Marah):**
-   - **Performa:** Moderat. ResNet50 mencatat peningkatan recall yang luar biasa hingga 56%.
+   - **Performa:** Moderat (Precision ~42–50%, Recall ~51–57%).
    - **Karakteristik Visual:** Berfokus pada kerutan alis ke arah bawah dan ketegangan rahang.
 5. **Disgust (Jijik):**
-   - **Performa:** Memiliki jumlah sampel paling sedikit dalam dataset (111 sampel uji). Berkat _class weights_, presisi ResNet50 terdongkrak hingga 40%.
+   - **Performa:** Memiliki jumlah sampel paling sedikit dalam dataset (111 sampel uji).
    - **Karakteristik Visual:** Kerutan pada hidung bagian atas dan bibir atas yang terangkat.
 6. **Sad (Sedih):**
    - **Performa:** Menjadi salah satu tantangan kasus tersulit dalam klasifikasi ekspresi.
-   - **Karakteristik Visual:** Cenderung salah diklasifikasikan sebagai _Neutral_ atau _Fear_ akibat kemiripan mikro-ekspresi.
+   - **Karakteristik Visual:** Cenderung salah diklasifikasikan sebagai _Neutral_ atau _Fear_.
 7. **Fear (Takut):**
-   - **Performa:** Kategori emosi paling kompleks (ResNet50 berhasil mendongkrak recall hingga 34%–40%).
-   - **Karakteristik Visual:** Memuat elemen gabungan antara mata membesar dan mulut menegang/mengerut.
+   - **Performa:** Kategori emosi paling kompleks.
+   - **Karakteristik Visual:** Memuat elemen gabungan antara mata membesar dan mulut menegang.
 
 ---
 
