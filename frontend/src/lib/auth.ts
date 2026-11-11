@@ -42,7 +42,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+          const apiUrl =
+            process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
           const { data } = await axios.post<LoginBackendResponse>(
             `${apiUrl}/auth/login`,
             {

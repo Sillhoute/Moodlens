@@ -67,7 +67,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://backend:9000/api
+        - NEXT_PUBLIC_API_URL=http://localhost:9000/api
     container_name: moodlens-frontend
     restart: always
     environment:
@@ -77,6 +77,7 @@ services:
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST}
       AUTH_SECRET: ${AUTH_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      INTERNAL_API_URL: http://backend:9000/api
     ports:
       - "4000:4000"
     depends_on:
