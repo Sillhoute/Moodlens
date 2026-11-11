@@ -239,7 +239,7 @@ export default function TrackPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-gradient-brand">
-            Tracking & Analisis Statistik
+            Tracking & Analisis Statistik by Elvis
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Pantau rekam jejak ekspresi wajah dan statistik performa sistem
