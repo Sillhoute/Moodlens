@@ -20,7 +20,7 @@ export function Navbar() {
   const navItems = [
     { name: "Overview", href: "/", icon: Home },
     { name: "Prediction", href: "/prediction", icon: ScanFace },
-    { name: "Stat", href: "/track", icon: Activity },
+    { name: "track", href: "/track", icon: Activity },
     { name: "Info", href: "/info", icon: Info },
   ];
 
