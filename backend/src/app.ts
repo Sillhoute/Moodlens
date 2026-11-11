@@ -24,8 +24,8 @@ app.use("/api/stats", statsRouter);
 
 // Health Check: benar-benar mengecek database dan model, dipakai healthcheck container dan smoke test CI/CD.
 app.get("/api/health", async (_req, res) => {
-  const database = await prisma
-    .$queryRaw`SELECT 1`.then(() => true)
+  const database = await prisma.$queryRaw`SELECT 1`
+    .then(() => true)
     .catch(() => false);
   const model = isMlReady();
   const sehat = database && model;
@@ -35,6 +35,7 @@ app.get("/api/health", async (_req, res) => {
     database,
     model,
     versi_aplikasi: process.env.APP_VERSION || "dev",
+    test_change: "Ini adalah perubahan untuk testing",
   });
 });
 
