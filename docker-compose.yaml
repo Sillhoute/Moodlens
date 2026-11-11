@@ -24,8 +24,6 @@ services:
 
   # 2. Container Backend Express.js + Python ML
   backend:
-    # Tanpa IMAGE_PREFIX di .env: build lokal (moodlens-backend:local).
-    # Saat deploy CI/CD: image dari Docker Hub dengan tag commit.
     image: ${IMAGE_PREFIX:-moodlens}-backend:${IMAGE_TAG:-local}
     build:
       context: ./backend
@@ -48,11 +46,16 @@ services:
       database:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/api/health', timeout=4)"]
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/api/health', timeout=4)",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
-      # Memuat TensorFlow dan kedua model butuh waktu saat container baru menyala.
       start_period: 180s
     networks:
       - fer_network
@@ -74,19 +77,12 @@ services:
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST}
       AUTH_SECRET: ${AUTH_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      # Dipakai server Next.js (login NextAuth) untuk memanggil backend lewat network Docker;
-      # "localhost" di dalam container frontend bukan alamat backend.
       INTERNAL_API_URL: http://backend:9000/api
     ports:
       - "4000:4000"
     depends_on:
       backend:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - fer_network
 
