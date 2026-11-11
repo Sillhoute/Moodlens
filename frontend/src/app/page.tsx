@@ -106,7 +106,7 @@ export default function OverviewPage() {
           <div className="flex items-center justify-between">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary">
               <ScanFace className="h-3.5 w-3.5" />
-              <span>FER-2013 Deep Learning Ensemble _ Contoh Deploy</span>
+              <span>FER-2013 Deep Learning Ensemble</span>
             </div>
             <button
               onClick={handleRefresh}
