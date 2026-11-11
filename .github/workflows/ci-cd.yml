@@ -3,8 +3,6 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -56,11 +54,8 @@ jobs:
 
   build-and-push:
     needs: [test-backend, test-frontend]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     strategy:
       matrix:
         service: [frontend, backend]
@@ -69,20 +64,12 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      # Image juga dikirim ke Docker Hub; dari sinilah server deploy menarik image.
-      - uses: docker/login-action@v3
-        with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository }}/${{ matrix.service }}
-            docker.io/${{ vars.DOCKERHUB_USERNAME }}/moodlens-${{ matrix.service }}
+          images: docker.io/${{ vars.DOCKERHUB_USERNAME }}/moodlens-${{ matrix.service }}
           tags: |
             type=raw,value=${{ github.sha }}
             type=raw,value=latest
@@ -97,13 +84,10 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # ---------- Continuous Deployment ----------
-  # Laptop server (self-hosted runner) menarik image commit ini dari Docker Hub lalu menjalankannya.
   deploy:
     needs: build-and-push
     runs-on: [self-hosted, Windows]
     env:
-      # Nilai untuk docker-compose.yaml. Rahasia diambil dari GitHub Secrets, tidak dari file .env.
       IMAGE_TAG: ${{ github.sha }}
       DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
       DB_USER: fer
@@ -118,7 +102,6 @@ jobs:
       NEXTAUTH_URL: http://localhost:4000
       AUTH_URL: http://localhost:4000/api/auth
       AUTH_TRUST_HOST: "true"
-      # Kalau secret AUTH_SECRET belum dibuat, JWT_SECRET dipakai sebagai gantinya.
       AUTH_SECRET: ${{ secrets.AUTH_SECRET || secrets.JWT_SECRET }}
       NEXTAUTH_SECRET: ${{ secrets.AUTH_SECRET || secrets.JWT_SECRET }}
     defaults:
@@ -132,15 +115,14 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Tarik image terbaru dan jalankan container
         run: |
-          # Docker menulis progres ke stderr, jadi kegagalan dicek dari exit code.
           $ErrorActionPreference = 'Continue'
-          # Nama image di registry wajib huruf kecil.
           $env:IMAGE_PREFIX = "docker.io/$($env:DOCKERHUB_USERNAME.ToLower())/moodlens"
-          # Password di-encode agar karakter seperti @ atau : tidak merusak URL database.
           $pw = [uri]::EscapeDataString($env:DB_PASSWORD)
           $env:DATABASE_URL = "postgresql://$($env:DB_USER):$pw@$($env:POSTGRES_HOST):$($env:DB_PORT)/$($env:DB_NAME)?schema=public"
+
           docker compose pull
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
           docker compose up -d --no-build --remove-orphans --wait --wait-timeout 420
           if ($LASTEXITCODE -ne 0) { docker compose ps; docker compose logs --tail 50 backend; exit 1 }
       - name: Smoke test
