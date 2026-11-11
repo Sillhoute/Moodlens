@@ -119,6 +119,7 @@ export default function OverviewPage() {
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight">
             Pengenalan Ekspresi Wajah{" "}
             <span className="text-gradient-brand">Real-Time</span>
+            <span className="text-gradient-brand">Added by Sharren</span>
           </h1>
           <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
             Sistem pengenalan ekspresi wajah berbasis kombinasi model Custom
